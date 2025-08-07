@@ -169,7 +169,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (isOnline) {
             profileOnlineStatus.textContent = 'Online';
             profileOnlineStatus.style.color = 'var(--accent-success)';
-            profileMotd.innerHTML = data.motd.replace(/§./g, '');
+            profileMotd.innerHTML = data.motd.replace(/§./g, ''); // Basic MOTD color code stripping
             profilePlayers.textContent = `${data.players.online} / ${data.players.max}`;
             profileVersion.textContent = data.version.name;
         } else {
@@ -264,7 +264,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const switchView = (viewName) => {
         views.forEach(view => {
             if (view.id === `${viewName}-view`) {
-                view.style.display = view.id === 'dashboard-view' ? 'grid' : 'block';
+                // The dashboard is a grid, others are blocks
+                view.style.display = view.id === 'dashboard-view' ? 'grid' : 'flex';
             } else {
                 view.style.display = 'none';
             }
@@ -370,6 +371,7 @@ document.addEventListener('DOMContentLoaded', () => {
         populateExploits();
         switchView('dashboard');
         
+        // Sync profiler inputs with main form inputs on load
         profileHostInput.value = document.getElementById('host').value;
         profilePortInput.value = document.getElementById('port').value;
     };

@@ -186,7 +186,7 @@ html, body {
     display: flex;
     flex-direction: column;
     gap: 2rem;
-    height: max-content;
+    /* Let the content determine the height */
 }
 
 /* Custom Scrollbar */
