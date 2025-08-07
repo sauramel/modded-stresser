@@ -1,16 +1,12 @@
-FROM python:3.11-slim
+FROM python:3.9-slim
 
 WORKDIR /app
-COPY . /app
 
+COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-ENV MODE=actor
-ENV CONTROLLER_HOST=http://controller:8000
-ENV TARGET_HOST=127.0.0.1
-ENV TARGET_PORT=25565
-ENV THREADS=200
-ENV DURATION=30
-ENV ACTOR_ID=actor-default
+COPY . .
 
-CMD ["python", "main.py"]
+# The command is now specified in docker-compose.yml
+# to differentiate between controller and actor modes.
+# CMD ["python", "main.py"]

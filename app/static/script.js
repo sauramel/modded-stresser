@@ -18,9 +18,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const startBtn = document.getElementById('start-btn');
     const stopBtn = document.getElementById('stop-btn');
     const updateBtn = document.getElementById('update-btn');
+    const queryBtn = document.getElementById('query-btn');
+    const queryStatusText = document.getElementById('query-status-text');
+    const queryResultsList = document.getElementById('query-results-list');
+    const queryMotd = document.getElementById('query-motd');
+    const queryPlayers = document.getElementById('query-players');
+    const queryVersion = document.getElementById('query-version');
+    const queryPlugins = document.getElementById('query-plugins');
 
     const API_BASE = window.location.origin;
-    let statusInterval;
 
     // --- API Functions ---
     const getHeaders = () => ({
@@ -33,23 +39,38 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch(`${API_BASE}${endpoint}`, options);
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
-                throw new Error(`HTTP ${response.status}: ${errorData.detail}`);
+                logToScreen({ level: 'ERROR', message: `API Error: ${errorData.detail || `HTTP ${response.status}`}` });
+                throw new Error(errorData.detail || `HTTP ${response.status}`);
             }
             return response.json();
         } catch (error) {
-            logToScreen(`API Error: ${error.message}`, 'error');
+            // Error is already logged by the time it gets here
             throw error;
         }
     };
 
-    const getStatus = async () => {
+    const queryServer = async () => {
+        const host = document.getElementById('host').value;
+        const port = parseInt(document.getElementById('port').value, 10);
+        if (!host || !port) {
+            queryStatusText.textContent = 'Enter a host and port to query.';
+            queryResultsList.classList.add('hidden');
+            return;
+        }
+
+        queryStatusText.textContent = 'Querying...';
+        queryResultsList.classList.add('hidden');
+
         try {
-            const data = await fetchAPI('/api/status', { headers: getHeaders() });
-            updateStatusUI(data);
-            updateActorsUI(data.actors || {});
+            const data = await fetchAPI('/api/query', {
+                method: 'POST',
+                headers: getHeaders(),
+                body: JSON.stringify({ host, port }),
+            });
+            updateQueryUI(data);
         } catch (error) {
-            updateStatusUI({ running: false, task_config: {} });
-            updateActorsUI({});
+            queryStatusText.textContent = `Query failed: ${error.message}`;
+            queryResultsList.classList.add('hidden');
         }
     };
 
@@ -66,9 +87,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (data.running) {
             statusIndicator.className = 'indicator-running';
             statusText.textContent = 'Running';
+            startBtn.disabled = true;
+            stopBtn.disabled = false;
         } else {
             statusIndicator.className = 'indicator-stopped';
             statusText.textContent = 'Idle';
+            startBtn.disabled = false;
+            stopBtn.disabled = true;
         }
         const config = data.task_config || {};
         configHost.textContent = config.host || 'N/A';
@@ -94,13 +119,22 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         actorIds.sort().forEach(id => {
             const li = document.createElement('li');
-            li.textContent = `ID: ${id}`;
+            li.textContent = `${id}`;
             actorList.appendChild(li);
         });
     };
 
-    const logToScreen = (message, type = 'info') => {
-        const timestamp = new Date().toLocaleTimeString();
+    const updateQueryUI = (data) => {
+        queryStatusText.textContent = '';
+        queryResultsList.classList.remove('hidden');
+        queryMotd.innerHTML = data.motd.replace(/§./g, ''); // Basic color code stripping
+        queryPlayers.textContent = `${data.num_players} / ${data.max_players}`;
+        queryVersion.textContent = data.version;
+        queryPlugins.textContent = data.plugins.length > 100 ? 'Too many to display' : data.plugins;
+    };
+
+    const logToScreen = (logData) => {
+        const timestamp = new Date(logData.timestamp || Date.now()).toLocaleTimeString();
         const line = document.createElement('span');
         line.classList.add('log-line');
 
@@ -110,29 +144,16 @@ document.addEventListener('DOMContentLoaded', () => {
         line.appendChild(timeEl);
 
         const msgEl = document.createElement('span');
-        let logClass = 'log-info';
-        let logMessage = message;
-
-        if (typeof message === 'object') {
-            logMessage = JSON.stringify(message);
-            if (message.actor_id) {
-                logClass = 'log-actor';
-                logMessage = `[${message.actor_id}] ${message.message}`;
-            }
-        } else {
-            if (message.includes('[STRESS-ERROR]') || type === 'error') {
-                logClass = 'log-error';
-            } else if (message.includes('[PROBE-') || type === 'warn') {
-                logClass = 'log-warn';
-            } else if (type === 'system') {
-                logClass = 'log-system';
-            } else if (type === 'success') {
-                logClass = 'log-success';
-            }
-        }
+        const level = (logData.level || 'info').toLowerCase();
+        const actorId = logData.actor_id;
         
-        msgEl.classList.add(logClass);
-        msgEl.textContent = logMessage;
+        let message = logData.message || JSON.stringify(logData);
+        if (actorId) {
+            message = `[${actorId}] ${message}`;
+        }
+
+        msgEl.classList.add(`log-${level}`);
+        msgEl.textContent = message;
         line.appendChild(msgEl);
         
         logBox.appendChild(line);
@@ -148,86 +169,96 @@ document.addEventListener('DOMContentLoaded', () => {
         const wsUrl = `${wsProtocol}//${window.location.host}/ws/logs`;
         const ws = new WebSocket(wsUrl);
 
-        ws.onopen = () => logToScreen('WebSocket connection established.', 'system');
-
+        ws.onopen = () => logToScreen({ level: 'SYSTEM', message: 'WebSocket connection established.' });
+        
         ws.onmessage = (event) => {
             try {
-                const logData = JSON.parse(event.data);
-                logToScreen(logData.message, logData.level || 'actor');
+                const data = JSON.parse(event.data);
+                switch (data.type) {
+                    case 'status_update':
+                        updateStatusUI(data.payload);
+                        updateActorsUI(data.payload.actors || {});
+                        break;
+                    case 'log':
+                        logToScreen(data.payload);
+                        break;
+                    default:
+                        logToScreen({ level: 'WARN', message: `Unknown WS message type: ${data.type}` });
+                }
             } catch (e) {
-                // Handle plain text logs from older actor versions or other sources
-                logToScreen(event.data, 'raw');
+                logToScreen({ level: 'ERROR', message: 'Failed to parse WebSocket message.' });
+                console.error("WS Parse Error:", e, event.data);
             }
         };
 
         ws.onclose = () => {
-            logToScreen('WebSocket connection closed. Reconnecting in 5 seconds...', 'warn');
+            logToScreen({ level: 'WARN', message: 'WebSocket connection closed. Reconnecting in 5 seconds...' });
             setTimeout(setupWebSocket, 5000);
         };
 
         ws.onerror = (error) => {
-            logToScreen('WebSocket error. See console for details.', 'error');
+            logToScreen({ level: 'ERROR', message: 'WebSocket error. See console for details.' });
             console.error('WebSocket Error:', error);
         };
     };
 
     // --- Event Listeners ---
     startBtn.addEventListener('click', async () => {
-        logToScreen('Starting stress test...', 'system');
+        logToScreen({ level: 'SYSTEM', message: 'Starting stress test...' });
         const config = getFormData();
         try {
-            const data = await fetchAPI('/api/start', {
+            await fetchAPI('/api/start', {
                 method: 'POST',
                 headers: getHeaders(),
                 body: JSON.stringify(config),
             });
-            logToScreen(data.status, 'success');
-            getStatus();
-        } catch (error) {}
+            // UI update will be handled by the WebSocket push
+        } catch (error) {
+            // Error is already logged by fetchAPI
+        }
     });
 
     stopBtn.addEventListener('click', async () => {
-        logToScreen('Stopping stress test...', 'system');
+        logToScreen({ level: 'SYSTEM', message: 'Stopping stress test...' });
         try {
-            const data = await fetchAPI('/api/stop', {
+            await fetchAPI('/api/stop', {
                 method: 'POST',
                 headers: getHeaders(),
             });
-            logToScreen(data.status, 'success');
-            getStatus();
+            // UI update will be handled by the WebSocket push
         } catch (error) {}
     });
 
     updateBtn.addEventListener('click', async () => {
-        logToScreen('Updating configuration...', 'system');
+        logToScreen({ level: 'SYSTEM', message: 'Updating configuration...' });
         const config = getFormData();
         try {
-            const data = await fetchAPI('/api/config', {
+            await fetchAPI('/api/config', {
                 method: 'PUT',
                 headers: getHeaders(),
                 body: JSON.stringify(config),
             });
-            logToScreen(data.status, 'success');
-            getStatus();
+            logToScreen({ level: 'SUCCESS', message: 'Configuration updated.' });
         } catch (error) {}
     });
     
     apiKeyInput.addEventListener('change', () => {
-        logToScreen('API Key updated. Fetching new status.', 'system');
-        getStatus();
+        logToScreen({ level: 'SYSTEM', message: 'API Key updated.' });
     });
 
     clearLogBtn.addEventListener('click', () => {
         logBox.innerHTML = '';
-        logToScreen('Logs cleared.', 'system');
+        logToScreen({ level: 'SYSTEM', message: 'Logs cleared.' });
     });
+
+    queryBtn.addEventListener('click', queryServer);
 
     // --- Initialization ---
     const init = () => {
-        logToScreen('Control panel initialized.', 'system');
-        getStatus();
-        statusInterval = setInterval(getStatus, 5000); // Refresh status every 5 seconds
+        logToScreen({ level: 'SYSTEM', message: 'Control panel initialized.' });
         setupWebSocket();
+        // Initial query on load
+        setTimeout(queryServer, 500);
     };
 
     init();

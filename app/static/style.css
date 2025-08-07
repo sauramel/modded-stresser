@@ -10,6 +10,7 @@
     --red-color: #f7768e;
     --yellow-color: #e0af68;
     --orange-color: #ff9e64;
+    --purple-color: #bb9af7;
     --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
 }
 
@@ -78,12 +79,24 @@ header h1 {
     margin-bottom: 1.5rem;
 }
 
-.card h2 {
+.card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
     margin-bottom: 1rem;
+}
+
+.card h2 {
     color: var(--text-color);
     border-bottom: 1px solid var(--border-color);
     padding-bottom: 0.5rem;
     font-size: 1.2rem;
+    width: 100%;
+}
+
+.card .card-header h2 {
+    border-bottom: none;
+    padding-bottom: 0;
 }
 
 .card h3 {
@@ -109,11 +122,11 @@ header h1 {
     font-size: 1.1rem;
 }
 
-#current-config ul {
+#current-config ul, #query-results-list {
     list-style: none;
     padding-left: 0;
 }
-#current-config li {
+#current-config li, #query-results-list li {
     margin-bottom: 0.5rem;
 }
 #current-config code {
@@ -169,6 +182,15 @@ header h1 {
 .btn-stop { background-color: var(--red-color); color: var(--bg-color); }
 .btn-update { background-color: var(--accent-color); color: var(--bg-color); }
 .btn-clear { background-color: var(--orange-color); color: var(--bg-color); padding: 0.25rem 0.75rem; }
+.btn-query { background-color: var(--purple-color); color: var(--bg-color); padding: 0.25rem 0.75rem; font-size: 0.8rem; }
+
+/* Server Query */
+#query-status-text {
+    color: var(--text-secondary-color);
+}
+.hidden {
+    display: none;
+}
 
 /* Actor List */
 #actor-list {
@@ -180,6 +202,8 @@ header h1 {
 #actor-list li {
     padding: 0.25rem;
     border-radius: 4px;
+    font-family: 'Fira Code', monospace;
+    font-size: 0.9rem;
 }
 #actor-list li:nth-child(odd) {
     background-color: var(--bg-color);
@@ -189,7 +213,7 @@ header h1 {
 .log-card {
     display: flex;
     flex-direction: column;
-    height: 60vh; /* Adjust as needed */
+    height: 70vh; /* Adjust as needed */
 }
 .log-header {
     display: flex;
@@ -223,4 +247,5 @@ header h1 {
 .log-success { color: var(--green-color); }
 .log-error { color: var(--red-color); font-weight: bold; }
 .log-warn { color: var(--yellow-color); }
-.log-actor { color: var(--orange-color); }
+.log-actor { color: var(--text-secondary-color); }
+.log-raw { color: var(--text-secondary-color); }

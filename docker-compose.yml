@@ -30,5 +30,5 @@ services:
     environment:
       - MODE=actor
       - CONTROLLER_HOST=http://controller:8000
-      # ACTOR_ID is generated automatically in config.py
+      # ACTOR_ID is now derived from the container hostname in config.py
     command: python main.py

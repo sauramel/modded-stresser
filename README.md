@@ -20,7 +20,9 @@ The use of this software to attack, disrupt, or gain unauthorized access to any 
 
 - **Distributed Architecture**: Scale your tests by deploying multiple actor nodes.
 - **Web UI Control Panel**: Modern, responsive web interface to start, stop, configure, and monitor tests.
+- **Live Server Query**: Fetches and displays live server status (MOTD, players, version) using the `mcquery` protocol.
 - **Real-time Log Streaming**: A WebSocket endpoint provides a live, color-coded feed of logs from all actors.
+- **Unique Actor IDs**: Actors automatically get unique IDs from their container hostnames for easy identification.
 - **Multiple Attack Modes**: Simulate different types of load on your server.
 - **Containerized**: Easily deploy the entire system using Docker and Docker Compose.
 
@@ -74,10 +76,11 @@ The easiest way to run the system is with Docker Compose.
     -   Enter your API key if you changed it.
     -   If testing a server on your **local machine**, set the **Target Host** to `host.docker.internal`. This special DNS name allows the Docker containers to reach services running on your computer.
     -   For a remote server, use its IP address or domain name.
+    -   The Server Status card will show live information if the server has `enable-query=true` in its `server.properties`.
     -   Choose your desired attack mode, threads, and duration.
     -   Click "Start".
 
-6.  **View Live Logs**: Logs from all actors will stream into the "Live Logs" panel in real-time.
+6.  **View Live Logs**: Logs from all actors will stream into the "Live Logs" panel in real-time. Actor IDs will appear as `project_actor_1`, `project_actor_2`, etc.
 
 7.  **Scale Actors**: You can change the number of running actors at any time.
     ```bash
@@ -96,6 +99,9 @@ The easiest way to run the system is with Docker Compose.
 
 The controller listens on port `8000`. All administrative endpoints under `/api/` require an API key to be sent in the `X-API-Key` header.
 
+#### `POST /api/query`
+Queries a server for its status using the UDP query protocol. Requires `host` and `port` in the JSON body.
+
 #### `GET /api/status`
 Get the current status, configuration, and active actors.
 
@@ -107,12 +113,6 @@ Stops the stress test.
 
 #### `PUT /api/config`
 Updates the task configuration without starting or stopping the test.
-
-#### `GET /api/actors`
-Get a list of all actors that have checked in recently.
-
-#### `GET /api/logs` & `GET /api/logs/{actor_id}`
-List and download raw log files for each actor.
 
 ### WebSocket Endpoint
 

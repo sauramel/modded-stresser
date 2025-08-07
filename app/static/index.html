@@ -19,7 +19,7 @@
             <!-- Left Column: Controls & Status -->
             <div class="control-column">
                 <div class="card">
-                    <h2><span id="status-indicator" class="indicator-stopped"></span> Status</h2>
+                    <h2><span id="status-indicator" class="indicator-stopped"></span> Attack Status</h2>
                     <p id="status-text">Idle</p>
                     <div id="current-config">
                         <h3>Current Configuration</h3>
@@ -29,6 +29,22 @@
                             <li><strong>Threads:</strong> <span id="config-threads">N/A</span></li>
                             <li><strong>Duration:</strong> <span id="config-duration">N/A</span>s</li>
                             <li><strong>Mode:</strong> <code id="config-mode">N/A</code></li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h2>Server Status</h2>
+                        <button id="query-btn" class="btn btn-query">Refresh</button>
+                    </div>
+                    <div id="server-status">
+                        <p id="query-status-text">Enter a host and port to query.</p>
+                        <ul id="query-results-list" class="hidden">
+                            <li><strong>MOTD:</strong> <span id="query-motd"></span></li>
+                            <li><strong>Players:</strong> <span id="query-players"></span></li>
+                            <li><strong>Version:</strong> <span id="query-version"></span></li>
+                            <li><strong>Plugins:</strong> <span id="query-plugins"></span></li>
                         </ul>
                     </div>
                 </div>
@@ -55,12 +71,11 @@
                         <div class="form-group">
                             <label for="mode">Attack Mode</label>
                             <select id="mode" required>
-                                <option value="login_flood">Login Flood (Standard)</option>
-                                <option value="join_spam">Join/Part Spam (High Churn)</option>
-                                <option value="chat_flood">Chat Flood (Resource Intensive)</option>
-                                <option value="motd_spam">MOTD Spam (Network)</option>
-                                <option value="modded_probe">Modded Probe (Gather Info)</option>
-                                <option value="modded_replay">Modded Replay (Fakes Modlist)</option>
+                                <option value="login_flood">Login Flood (Offline Mode)</option>
+                                <option value="join_spam">Join/Part Spam (Offline Mode)</option>
+                                <option value="chat_flood">Chat Flood (Offline Mode)</option>
+                                <option value="modded_flood">Modded Flood (Offline Mode)</option>
+                                <option value="motd_spam">MOTD Spam (Any Server)</option>
                             </select>
                         </div>
                         <div class="button-group">
