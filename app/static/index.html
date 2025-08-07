@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mission Control | Exploit Framework</title>
+    <title>Voidout | Exploit Framework</title>
     <link rel="stylesheet" href="/static/style.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
 </head>
@@ -12,7 +12,7 @@
         <aside class="sidebar">
             <div class="sidebar-header">
                 <i class="fas fa-crosshairs logo"></i>
-                <h1>Framework</h1>
+                <h1>Voidout</h1>
             </div>
             <nav class="nav-menu">
                 <a class="nav-item active" data-view="dashboard"><i class="fas fa-tachometer-alt"></i><span>Dashboard</span></a>
@@ -22,6 +22,7 @@
             </nav>
             <div class="sidebar-footer">
                 <input type="password" id="apiKey" class="api-key-input" placeholder="Enter API Key" value="you-should-really-change-this">
+                <div class="copyright">Copyright © 2025 Sauramel</div>
             </div>
         </aside>
 
@@ -60,22 +61,9 @@
                                     <input type="number" id="duration" value="60" required>
                                 </div>
                                 <div class="form-group" style="grid-column: 1 / -1;">
-                                    <label for="mode">Attack Mode / Exploit</label>
-                                    <select id="mode" required>
-                                        <optgroup label="Denial of Service">
-                                            <option value="login_flood">Login Flood</option>
-                                            <option value="join_spam">Join/Part Spam</option>
-                                            <option value="chat_flood">Chat Flood</option>
-                                            <option value="motd_spam">MOTD Spam (Ping)</option>
-                                            <option value="handshake_spam">Handshake Spam</option>
-                                        </optgroup>
-                                        <optgroup label="Modded">
-                                            <option value="modded_flood">Modded Flood (FML)</option>
-                                        </optgroup>
-                                        <optgroup label="Exploits (Coming Soon)">
-                                            <option value="book_crash" disabled>Book Crash (1.12-1.16)</option>
-                                            <option value="chunk_overload" disabled>Chunk Overload (1.8-1.12)</option>
-                                        </optgroup>
+                                    <label for="exploit">Attack Mode / Exploit</label>
+                                    <select id="exploit" required>
+                                        <option>Loading exploits...</option>
                                     </select>
                                 </div>
                             </div>
@@ -108,21 +96,27 @@
                 <div class="info-column">
                     <div class="card">
                         <div class="card-header">
-                            <h3><i class="fas fa-server"></i> Server Status</h3>
-                            <button id="query-btn" class="btn btn-secondary" style="padding: 0.4rem 0.8rem; font-size: 0.8rem;">Refresh</button>
+                            <h3><i class="fas fa-server"></i> Server Profile</h3>
+                            <button id="profile-btn" class="btn btn-secondary" style="padding: 0.4rem 0.8rem; font-size: 0.8rem;">Profile</button>
                         </div>
                         <div id="server-status">
-                            <p id="query-status-text">Enter host/port and refresh.</p>
+                            <p id="profile-status-text">Enter host/port and click Profile.</p>
                             <ul id="server-status-list" class="hidden">
-                                <li><strong>Status</strong><span id="query-online-status"></span></li>
-                                <li><strong>Version</strong><span id="query-version"></span></li>
-                                <li><strong>Players</strong><span id="query-players"></span></li>
-                                <li><strong>Plugins</strong><span id="query-plugins"></span></li>
+                                <li><strong>Status</strong><span id="profile-online-status"></span></li>
+                                <li><strong>Version</strong><span id="profile-version"></span></li>
+                                <li><strong>Type</strong><span id="profile-type"></span></li>
+                                <li><strong>Players</strong><span id="profile-players"></span></li>
                                 <li style="flex-direction: column; align-items: flex-start;">
                                     <strong>MOTD</strong>
-                                    <pre id="query-motd"></pre>
+                                    <pre id="profile-motd"></pre>
                                 </li>
                             </ul>
+                            <div id="mod-list-container" class="hidden" style="margin-top: 1rem;">
+                                <h4><i class="fas fa-box-open"></i> Mods (<span id="mod-count">0</span>)</h4>
+                                <ul id="mod-list" class="compact-list">
+                                    <!-- Mod list will be populated here -->
+                                </ul>
+                            </div>
                         </div>
                     </div>
                     <div class="card">
@@ -137,7 +131,7 @@
                         <div class="card-header">
                             <h3><i class="fas fa-cogs"></i> Current Task</h3>
                         </div>
-                        <ul id="server-status-list">
+                        <ul id="task-details-list">
                             <li><strong>Host</strong><span id="config-host">N/A</span></li>
                             <li><strong>Port</strong><span id="config-port">N/A</span></li>
                             <li><strong>Mode</strong><code id="config-mode">N/A</code></li>

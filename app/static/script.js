@@ -314,7 +314,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Initialization ---
     const init = () => {
-        logToScreen({ level: 'SYSTEM', message: 'Mission Control UI initialized.' });
+        logToScreen({ level: 'SYSTEM', message: 'Voidout UI initialized.' });
         setupWebSocket();
         populateExploits();
         // Initial profile on load if host is set

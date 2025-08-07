@@ -19,7 +19,7 @@ class TaskConfig(BaseModel):
     port: int
     threads: int
     duration: int
-    exploit: str # Changed from 'mode'
+    exploit: str
     exploit_args: Optional[Dict[str, Any]] = {}
 
 class ProfileRequest(BaseModel):
@@ -83,7 +83,7 @@ async def get_api_key(key: str = Depends(api_key_header)):
         )
 
 # --- FastAPI App ---
-app = FastAPI(title="Exploit Framework Controller", description="Controller for distributed exploitation tasks.")
+app = FastAPI(title="Voidout Exploit Framework Controller", description="Controller for distributed exploitation tasks.")
 
 static_dir = Path(__file__).parent / "static"
 app.mount("/static", StaticFiles(directory=static_dir), name="static")
