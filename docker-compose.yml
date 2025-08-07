@@ -21,6 +21,10 @@ services:
       dockerfile: app/Dockerfile
     depends_on:
       - controller
+    # Add extra_hosts to allow actors to connect to the host machine via host.docker.internal
+    # This is required on Linux and good practice for all platforms.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     deploy:
       replicas: 3 # Default number of actors, scale with `docker-compose up --scale actor=N`
     environment:

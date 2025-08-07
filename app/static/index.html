@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stresser Controller</title>
+    <title>Stresser Control Panel</title>
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
@@ -11,14 +11,13 @@
         <header>
             <h1>Stresser Control Panel</h1>
             <div class="api-key-container">
-                <label for="apiKey">API Key:</label>
-                <input type="password" id="apiKey" placeholder="Enter your API key" value="you-should-really-change-this">
+                <input type="password" id="apiKey" placeholder="Enter API key" value="you-should-really-change-this">
             </div>
         </header>
 
-        <main>
-            <div class="grid">
-                <!-- Status & Config -->
+        <main class="main-grid">
+            <!-- Left Column: Controls & Status -->
+            <div class="control-column">
                 <div class="card">
                     <h2><span id="status-indicator" class="indicator-stopped"></span> Status</h2>
                     <p id="status-text">Idle</p>
@@ -34,13 +33,12 @@
                     </div>
                 </div>
 
-                <!-- Controls -->
                 <div class="card">
                     <h2>Controls</h2>
                     <form id="control-form">
                         <div class="form-group">
                             <label for="host">Target Host</label>
-                            <input type="text" id="host" required>
+                            <input type="text" id="host" required placeholder="e.g., host.docker.internal">
                         </div>
                         <div class="form-group">
                             <label for="port">Target Port</label>
@@ -55,11 +53,14 @@
                             <input type="number" id="duration" value="30" required>
                         </div>
                         <div class="form-group">
-                            <label for="mode">Mode</label>
+                            <label for="mode">Attack Mode</label>
                             <select id="mode" required>
-                                <option value="login_flood">Login Flood</option>
-                                <option value="modded_probe">Modded Probe</option>
-                                <option value="modded_replay">Modded Replay</option>
+                                <option value="login_flood">Login Flood (Standard)</option>
+                                <option value="join_spam">Join/Part Spam (High Churn)</option>
+                                <option value="chat_flood">Chat Flood (Resource Intensive)</option>
+                                <option value="motd_spam">MOTD Spam (Network)</option>
+                                <option value="modded_probe">Modded Probe (Gather Info)</option>
+                                <option value="modded_replay">Modded Replay (Fakes Modlist)</option>
                             </select>
                         </div>
                         <div class="button-group">
@@ -69,22 +70,28 @@
                         </div>
                     </form>
                 </div>
-
-                <!-- Actors -->
-                <div class="card">
-                    <h2>Active Actors</h2>
-                    <p>Actors that have checked in recently.</p>
-                    <ul id="actor-list">
-                        <!-- Actors will be populated by JS -->
-                    </ul>
-                </div>
             </div>
 
-            <!-- Live Logs -->
-            <div class="card">
-                <h2>Live Logs</h2>
-                <div id="log-container">
-                    <pre id="log-box"></pre>
+            <!-- Right Column: Actors & Logs -->
+            <div class="log-column">
+                <div class="card">
+                    <h2>Active Actors (<span id="actor-count">0</span>)</h2>
+                    <ul id="actor-list">
+                        <li>No actors have checked in.</li>
+                    </ul>
+                </div>
+                <div class="card log-card">
+                    <div class="log-header">
+                        <h2>Live Logs</h2>
+                        <div class="log-controls">
+                            <label for="pause-scroll">Pause Scroll</label>
+                            <input type="checkbox" id="pause-scroll">
+                            <button id="clear-log-btn" class="btn btn-clear">Clear</button>
+                        </div>
+                    </div>
+                    <div id="log-container">
+                        <pre id="log-box"></pre>
+                    </div>
                 </div>
             </div>
         </main>

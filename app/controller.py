@@ -17,7 +17,7 @@ class TaskConfig(BaseModel):
     port: int
     threads: int
     duration: int
-    mode: str  # 'login_flood', 'modded_probe', 'modded_replay'
+    mode: str  # 'login_flood', 'join_spam', 'chat_flood', 'motd_spam', 'modded_probe', 'modded_replay'
 
 # --- In-memory State ---
 state: Dict[str, Any] = {
@@ -105,6 +105,13 @@ async def post_log(data: dict):
 @app.get("/api/status", dependencies=[Depends(get_api_key)])
 def get_status():
     """Get the current status, configuration, and active actors."""
+    # Prune actors that haven't been seen in a while
+    now = datetime.utcnow()
+    pruned_actors = {
+        id: info for id, info in state["actors"].items()
+        if (now - datetime.fromisoformat(info["last_seen"])).total_seconds() < 60
+    }
+    state["actors"] = pruned_actors
     return state
 
 @app.get("/api/actors", dependencies=[Depends(get_api_key)])

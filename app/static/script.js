@@ -8,8 +8,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const configThreads = document.getElementById('config-threads');
     const configDuration = document.getElementById('config-duration');
     const configMode = document.getElementById('config-mode');
+    const actorCount = document.getElementById('actor-count');
     const actorList = document.getElementById('actor-list');
     const logBox = document.getElementById('log-box');
+    const logContainer = document.getElementById('log-container');
+    const pauseScrollCheckbox = document.getElementById('pause-scroll');
+    const clearLogBtn = document.getElementById('clear-log-btn');
     const form = document.getElementById('control-form');
     const startBtn = document.getElementById('start-btn');
     const stopBtn = document.getElementById('stop-btn');
@@ -44,7 +48,6 @@ document.addEventListener('DOMContentLoaded', () => {
             updateStatusUI(data);
             updateActorsUI(data.actors || {});
         } catch (error) {
-            // Error is already logged by fetchAPI
             updateStatusUI({ running: false, task_config: {} });
             updateActorsUI({});
         }
@@ -74,22 +77,22 @@ document.addEventListener('DOMContentLoaded', () => {
         configDuration.textContent = config.duration || 'N/A';
         configMode.textContent = config.mode || 'N/A';
 
-        // Populate form with current config if not already filled
         if (!form.host.value && config.host) form.host.value = config.host;
         if (!form.port.value && config.port) form.port.value = config.port;
         if (!form.threads.value && config.threads) form.threads.value = config.threads;
         if (!form.duration.value && config.duration) form.duration.value = config.duration;
-        if (!form.mode.value && config.mode) form.mode.value = config.mode;
+        if (config.mode) form.mode.value = config.mode;
     };
 
     const updateActorsUI = (actors) => {
-        actorList.innerHTML = '';
         const actorIds = Object.keys(actors);
+        actorCount.textContent = actorIds.length;
+        actorList.innerHTML = '';
         if (actorIds.length === 0) {
             actorList.innerHTML = '<li>No actors have checked in.</li>';
             return;
         }
-        actorIds.forEach(id => {
+        actorIds.sort().forEach(id => {
             const li = document.createElement('li');
             li.textContent = `ID: ${id}`;
             actorList.appendChild(li);
@@ -98,14 +101,45 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const logToScreen = (message, type = 'info') => {
         const timestamp = new Date().toLocaleTimeString();
-        let formattedMessage = `[${timestamp}] `;
+        const line = document.createElement('span');
+        line.classList.add('log-line');
+
+        const timeEl = document.createElement('span');
+        timeEl.classList.add('log-timestamp');
+        timeEl.textContent = `[${timestamp}]`;
+        line.appendChild(timeEl);
+
+        const msgEl = document.createElement('span');
+        let logClass = 'log-info';
+        let logMessage = message;
+
         if (typeof message === 'object') {
-            formattedMessage += JSON.stringify(message, null, 2);
+            logMessage = JSON.stringify(message);
+            if (message.actor_id) {
+                logClass = 'log-actor';
+                logMessage = `[${message.actor_id}] ${message.message}`;
+            }
         } else {
-            formattedMessage += message;
+            if (message.includes('[STRESS-ERROR]') || type === 'error') {
+                logClass = 'log-error';
+            } else if (message.includes('[PROBE-') || type === 'warn') {
+                logClass = 'log-warn';
+            } else if (type === 'system') {
+                logClass = 'log-system';
+            } else if (type === 'success') {
+                logClass = 'log-success';
+            }
         }
-        logBox.textContent += formattedMessage + '\n';
-        logBox.scrollTop = logBox.scrollHeight;
+        
+        msgEl.classList.add(logClass);
+        msgEl.textContent = logMessage;
+        line.appendChild(msgEl);
+        
+        logBox.appendChild(line);
+
+        if (!pauseScrollCheckbox.checked) {
+            logContainer.scrollTop = logContainer.scrollHeight;
+        }
     };
 
     // --- WebSocket ---
@@ -114,21 +148,20 @@ document.addEventListener('DOMContentLoaded', () => {
         const wsUrl = `${wsProtocol}//${window.location.host}/ws/logs`;
         const ws = new WebSocket(wsUrl);
 
-        ws.onopen = () => {
-            logToScreen('WebSocket connection established.', 'system');
-        };
+        ws.onopen = () => logToScreen('WebSocket connection established.', 'system');
 
         ws.onmessage = (event) => {
             try {
                 const logData = JSON.parse(event.data);
-                logToScreen(logData, 'log');
+                logToScreen(logData.message, logData.level || 'actor');
             } catch (e) {
+                // Handle plain text logs from older actor versions or other sources
                 logToScreen(event.data, 'raw');
             }
         };
 
         ws.onclose = () => {
-            logToScreen('WebSocket connection closed. Reconnecting in 5 seconds...', 'system');
+            logToScreen('WebSocket connection closed. Reconnecting in 5 seconds...', 'warn');
             setTimeout(setupWebSocket, 5000);
         };
 
@@ -184,11 +217,16 @@ document.addEventListener('DOMContentLoaded', () => {
         getStatus();
     });
 
+    clearLogBtn.addEventListener('click', () => {
+        logBox.innerHTML = '';
+        logToScreen('Logs cleared.', 'system');
+    });
+
     // --- Initialization ---
     const init = () => {
         logToScreen('Control panel initialized.', 'system');
         getStatus();
-        statusInterval = setInterval(getStatus, 10000); // Refresh status every 10 seconds
+        statusInterval = setInterval(getStatus, 5000); // Refresh status every 5 seconds
         setupWebSocket();
     };
 
