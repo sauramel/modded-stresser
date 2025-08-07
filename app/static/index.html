@@ -3,110 +3,147 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stresser Control Panel</title>
+    <title>Mission Control | Exploit Framework</title>
     <link rel="stylesheet" href="/static/style.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
 </head>
 <body>
     <div class="container">
-        <header>
-            <h1>Stresser Control Panel</h1>
-            <div class="api-key-container">
-                <input type="password" id="apiKey" placeholder="Enter API key" value="you-should-really-change-this">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <i class="fas fa-crosshairs logo"></i>
+                <h1>Framework</h1>
             </div>
-        </header>
+            <nav class="nav-menu">
+                <a class="nav-item active" data-view="dashboard"><i class="fas fa-tachometer-alt"></i><span>Dashboard</span></a>
+                <a class="nav-item" data-view="profiler"><i class="fas fa-search-location"></i><span>Target Profiler</span></a>
+                <a class="nav-item" data-view="exploits"><i class="fas fa-bomb"></i><span>Exploit Library</span></a>
+                <a class="nav-item" data-view="actors"><i class="fas fa-users"></i><span>Actor Management</span></a>
+            </nav>
+            <div class="sidebar-footer">
+                <input type="password" id="apiKey" class="api-key-input" placeholder="Enter API Key" value="you-should-really-change-this">
+            </div>
+        </aside>
 
-        <main class="main-grid">
-            <!-- Left Column: Controls & Status -->
-            <div class="control-column">
-                <div class="card">
-                    <h2><span id="status-indicator" class="indicator-stopped"></span> Attack Status</h2>
-                    <p id="status-text">Idle</p>
-                    <div id="current-config">
-                        <h3>Current Configuration</h3>
-                        <ul>
-                            <li><strong>Host:</strong> <span id="config-host">N/A</span></li>
-                            <li><strong>Port:</strong> <span id="config-port">N/A</span></li>
-                            <li><strong>Threads:</strong> <span id="config-threads">N/A</span></li>
-                            <li><strong>Duration:</strong> <span id="config-duration">N/A</span>s</li>
-                            <li><strong>Mode:</strong> <code id="config-mode">N/A</code></li>
+        <main class="main-content">
+            <header class="main-header">
+                <h2 id="view-title">Dashboard</h2>
+                <div class="status-indicator">
+                    <div id="status-indicator-dot" class="indicator-dot stopped"></div>
+                    <span id="status-text">Idle</span>
+                </div>
+            </header>
+
+            <div class="content-area">
+                <!-- Main Control Column -->
+                <div class="control-column">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3><i class="fas fa-bullseye"></i> Attack Configuration</h3>
+                        </div>
+                        <form id="control-form">
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label for="host">Target Host</label>
+                                    <input type="text" id="host" required placeholder="e.g., host.docker.internal">
+                                </div>
+                                <div class="form-group">
+                                    <label for="port">Target Port</label>
+                                    <input type="number" id="port" value="25565" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="threads">Threads</label>
+                                    <input type="number" id="threads" value="200" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="duration">Duration (s)</label>
+                                    <input type="number" id="duration" value="60" required>
+                                </div>
+                                <div class="form-group" style="grid-column: 1 / -1;">
+                                    <label for="mode">Attack Mode / Exploit</label>
+                                    <select id="mode" required>
+                                        <optgroup label="Denial of Service">
+                                            <option value="login_flood">Login Flood</option>
+                                            <option value="join_spam">Join/Part Spam</option>
+                                            <option value="chat_flood">Chat Flood</option>
+                                            <option value="motd_spam">MOTD Spam (Ping)</option>
+                                            <option value="handshake_spam">Handshake Spam</option>
+                                        </optgroup>
+                                        <optgroup label="Modded">
+                                            <option value="modded_flood">Modded Flood (FML)</option>
+                                        </optgroup>
+                                        <optgroup label="Exploits (Coming Soon)">
+                                            <option value="book_crash" disabled>Book Crash (1.12-1.16)</option>
+                                            <option value="chunk_overload" disabled>Chunk Overload (1.8-1.12)</option>
+                                        </optgroup>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="button-group">
+                                <button type="button" id="start-btn" class="btn btn-primary"><i class="fas fa-play"></i> Start Task</button>
+                                <button type="button" id="stop-btn" class="btn btn-danger" disabled><i class="fas fa-stop"></i> Stop Task</button>
+                                <button type="button" id="update-btn" class="btn btn-secondary"><i class="fas fa-sync-alt"></i> Update Live</button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <div class="card log-card">
+                        <div class="card-header">
+                            <h3><i class="fas fa-terminal"></i> Live Operations Log</h3>
+                            <div class="log-controls">
+                                <label for="pause-scroll">
+                                    <input type="checkbox" id="pause-scroll">
+                                    <span>Pause</span>
+                                </label>
+                                <button id="clear-log-btn" class="btn btn-secondary" style="padding: 0.4rem 0.8rem; font-size: 0.8rem;">Clear</button>
+                            </div>
+                        </div>
+                        <div class="log-container">
+                            <pre id="log-box"></pre>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Info Column -->
+                <div class="info-column">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3><i class="fas fa-server"></i> Server Status</h3>
+                            <button id="query-btn" class="btn btn-secondary" style="padding: 0.4rem 0.8rem; font-size: 0.8rem;">Refresh</button>
+                        </div>
+                        <div id="server-status">
+                            <p id="query-status-text">Enter host/port and refresh.</p>
+                            <ul id="server-status-list" class="hidden">
+                                <li><strong>Status</strong><span id="query-online-status"></span></li>
+                                <li><strong>Version</strong><span id="query-version"></span></li>
+                                <li><strong>Players</strong><span id="query-players"></span></li>
+                                <li><strong>Plugins</strong><span id="query-plugins"></span></li>
+                                <li style="flex-direction: column; align-items: flex-start;">
+                                    <strong>MOTD</strong>
+                                    <pre id="query-motd"></pre>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header">
+                            <h3><i class="fas fa-users"></i> Active Actors (<span id="actor-count">0</span>)</h3>
+                        </div>
+                        <ul id="actor-list">
+                            <li>No actors have checked in.</li>
                         </ul>
                     </div>
-                </div>
-
-                <div class="card">
-                    <div class="card-header">
-                        <h2>Server Status</h2>
-                        <button id="query-btn" class="btn btn-query">Refresh</button>
-                    </div>
-                    <div id="server-status">
-                        <p id="query-status-text">Enter a host and port to query.</p>
-                        <ul id="query-results-list" class="hidden">
-                            <li><strong>MOTD:</strong> <span id="query-motd"></span></li>
-                            <li><strong>Players:</strong> <span id="query-players"></span></li>
-                            <li><strong>Version:</strong> <span id="query-version"></span></li>
-                            <li><strong>Plugins:</strong> <span id="query-plugins"></span></li>
+                    <div class="card">
+                        <div class="card-header">
+                            <h3><i class="fas fa-cogs"></i> Current Task</h3>
+                        </div>
+                        <ul id="server-status-list">
+                            <li><strong>Host</strong><span id="config-host">N/A</span></li>
+                            <li><strong>Port</strong><span id="config-port">N/A</span></li>
+                            <li><strong>Mode</strong><code id="config-mode">N/A</code></li>
+                            <li><strong>Threads</strong><span id="config-threads">N/A</span></li>
+                            <li><strong>Duration</strong><span id="config-duration">N/A</span>s</li>
                         </ul>
-                    </div>
-                </div>
-
-                <div class="card">
-                    <h2>Controls</h2>
-                    <form id="control-form">
-                        <div class="form-group">
-                            <label for="host">Target Host</label>
-                            <input type="text" id="host" required placeholder="e.g., host.docker.internal">
-                        </div>
-                        <div class="form-group">
-                            <label for="port">Target Port</label>
-                            <input type="number" id="port" value="25565" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="threads">Threads</label>
-                            <input type="number" id="threads" value="200" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="duration">Duration (s)</label>
-                            <input type="number" id="duration" value="30" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="mode">Attack Mode</label>
-                            <select id="mode" required>
-                                <option value="login_flood">Login Flood (Offline Mode)</option>
-                                <option value="join_spam">Join/Part Spam (Offline Mode)</option>
-                                <option value="chat_flood">Chat Flood (Offline Mode)</option>
-                                <option value="modded_flood">Modded Flood (Offline Mode)</option>
-                                <option value="motd_spam">MOTD Spam (Any Server)</option>
-                                <option value="handshake_spam">Handshake Spam (Online Mode)</option>
-                            </select>
-                        </div>
-                        <div class="button-group">
-                            <button type="button" id="start-btn" class="btn btn-start">Start</button>
-                            <button type="button" id="stop-btn" class="btn btn-stop">Stop</button>
-                            <button type="button" id="update-btn" class="btn btn-update">Update Config</button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-
-            <!-- Right Column: Actors & Logs -->
-            <div class="log-column">
-                <div class="card">
-                    <h2>Active Actors (<span id="actor-count">0</span>)</h2>
-                    <ul id="actor-list">
-                        <li>No actors have checked in.</li>
-                    </ul>
-                </div>
-                <div class="card log-card">
-                    <div class="log-header">
-                        <h2>Live Logs</h2>
-                        <div class="log-controls">
-                            <label for="pause-scroll">Pause Scroll</label>
-                            <input type="checkbox" id="pause-scroll">
-                            <button id="clear-log-btn" class="btn btn-clear">Clear</button>
-                        </div>
-                    </div>
-                    <div id="log-container">
-                        <pre id="log-box"></pre>
                     </div>
                 </div>
             </div>

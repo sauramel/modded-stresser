@@ -1,26 +1,37 @@
 document.addEventListener('DOMContentLoaded', () => {
     // --- DOM Elements ---
     const apiKeyInput = document.getElementById('apiKey');
-    const statusIndicator = document.getElementById('status-indicator');
+    const statusIndicatorDot = document.getElementById('status-indicator-dot');
     const statusText = document.getElementById('status-text');
+    
+    // Config display
     const configHost = document.getElementById('config-host');
     const configPort = document.getElementById('config-port');
     const configThreads = document.getElementById('config-threads');
     const configDuration = document.getElementById('config-duration');
     const configMode = document.getElementById('config-mode');
+    
+    // Actor display
     const actorCount = document.getElementById('actor-count');
     const actorList = document.getElementById('actor-list');
+    
+    // Logs
     const logBox = document.getElementById('log-box');
     const logContainer = document.getElementById('log-container');
     const pauseScrollCheckbox = document.getElementById('pause-scroll');
     const clearLogBtn = document.getElementById('clear-log-btn');
+    
+    // Form
     const form = document.getElementById('control-form');
     const startBtn = document.getElementById('start-btn');
     const stopBtn = document.getElementById('stop-btn');
     const updateBtn = document.getElementById('update-btn');
+    
+    // Query
     const queryBtn = document.getElementById('query-btn');
     const queryStatusText = document.getElementById('query-status-text');
-    const queryResultsList = document.getElementById('query-results-list');
+    const serverStatusList = document.getElementById('server-status-list');
+    const queryOnlineStatus = document.getElementById('query-online-status');
     const queryMotd = document.getElementById('query-motd');
     const queryPlayers = document.getElementById('query-players');
     const queryVersion = document.getElementById('query-version');
@@ -44,7 +55,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             return response.json();
         } catch (error) {
-            // Error is already logged by the time it gets here
+            logToScreen({ level: 'ERROR', message: `Request failed: ${error.message}` });
             throw error;
         }
     };
@@ -54,12 +65,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const port = parseInt(document.getElementById('port').value, 10);
         if (!host || !port) {
             queryStatusText.textContent = 'Enter a host and port to query.';
-            queryResultsList.classList.add('hidden');
+            serverStatusList.classList.add('hidden');
             return;
         }
 
-        queryStatusText.textContent = 'Querying...';
-        queryResultsList.classList.add('hidden');
+        queryStatusText.textContent = 'Pinging server...';
+        queryStatusText.classList.remove('hidden');
+        serverStatusList.classList.add('hidden');
 
         try {
             const data = await fetchAPI('/api/query', {
@@ -67,10 +79,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 headers: getHeaders(),
                 body: JSON.stringify({ host, port }),
             });
-            updateQueryUI(data);
+            updateQueryUI(data, true);
         } catch (error) {
-            queryStatusText.textContent = `Query failed: ${error.message}`;
-            queryResultsList.classList.add('hidden');
+            updateQueryUI({ error: error.message }, false);
         }
     };
 
@@ -85,12 +96,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- UI Update Functions ---
     const updateStatusUI = (data) => {
         if (data.running) {
-            statusIndicator.className = 'indicator-running';
-            statusText.textContent = 'Running';
+            statusIndicatorDot.className = 'indicator-dot running';
+            statusText.textContent = 'Task Running';
             startBtn.disabled = true;
             stopBtn.disabled = false;
         } else {
-            statusIndicator.className = 'indicator-stopped';
+            statusIndicatorDot.className = 'indicator-dot stopped';
             statusText.textContent = 'Idle';
             startBtn.disabled = false;
             stopBtn.disabled = true;
@@ -102,10 +113,11 @@ document.addEventListener('DOMContentLoaded', () => {
         configDuration.textContent = config.duration || 'N/A';
         configMode.textContent = config.mode || 'N/A';
 
+        // Pre-fill form if empty
         if (!form.host.value && config.host) form.host.value = config.host;
-        if (!form.port.value && config.port) form.port.value = config.port;
-        if (!form.threads.value && config.threads) form.threads.value = config.threads;
-        if (!form.duration.value && config.duration) form.duration.value = config.duration;
+        if (form.port.value === "25565" && config.port) form.port.value = config.port;
+        if (form.threads.value === "200" && config.threads) form.threads.value = config.threads;
+        if (form.duration.value === "60" && config.duration) form.duration.value = config.duration;
         if (config.mode) form.mode.value = config.mode;
     };
 
@@ -119,18 +131,30 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         actorIds.sort().forEach(id => {
             const li = document.createElement('li');
-            li.textContent = `${id}`;
+            li.textContent = `${id.substring(0, 12)}`; // Shorten ID
             actorList.appendChild(li);
         });
     };
 
-    const updateQueryUI = (data) => {
-        queryStatusText.textContent = '';
-        queryResultsList.classList.remove('hidden');
-        queryMotd.innerHTML = data.motd.replace(/§./g, ''); // Basic color code stripping
-        queryPlayers.textContent = `${data.num_players} / ${data.max_players}`;
-        queryVersion.textContent = data.version;
-        queryPlugins.textContent = data.plugins.length > 100 ? 'Too many to display' : data.plugins;
+    const updateQueryUI = (data, isOnline) => {
+        queryStatusText.classList.add('hidden');
+        serverStatusList.classList.remove('hidden');
+
+        if (isOnline) {
+            queryOnlineStatus.textContent = 'Online';
+            queryOnlineStatus.style.color = 'var(--accent-success)';
+            queryMotd.innerHTML = data.motd.replace(/§./g, ''); // Basic color code stripping
+            queryPlayers.textContent = `${data.num_players} / ${data.max_players}`;
+            queryVersion.textContent = data.version;
+            queryPlugins.textContent = data.plugins.length > 50 ? 'Too many to display' : (data.plugins || 'N/A');
+        } else {
+            queryOnlineStatus.textContent = 'Offline';
+            queryOnlineStatus.style.color = 'var(--accent-danger)';
+            queryMotd.textContent = data.error || 'Failed to connect.';
+            queryPlayers.textContent = 'N/A';
+            queryVersion.textContent = 'N/A';
+            queryPlugins.textContent = 'N/A';
+        }
     };
 
     const logToScreen = (logData) => {
@@ -149,7 +173,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         let message = logData.message || JSON.stringify(logData);
         if (actorId) {
-            message = `[${actorId}] ${message}`;
+            message = `[${actorId.substring(0, 12)}] ${message}`;
         }
 
         msgEl.classList.add(`log-${level}`);
@@ -169,7 +193,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const wsUrl = `${wsProtocol}//${window.location.host}/ws/logs`;
         const ws = new WebSocket(wsUrl);
 
-        ws.onopen = () => logToScreen({ level: 'SYSTEM', message: 'WebSocket connection established.' });
+        ws.onopen = () => logToScreen({ level: 'SYSTEM', message: 'Framework connection established.' });
         
         ws.onmessage = (event) => {
             try {
@@ -192,19 +216,19 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         ws.onclose = () => {
-            logToScreen({ level: 'WARN', message: 'WebSocket connection closed. Reconnecting in 5 seconds...' });
+            logToScreen({ level: 'WARN', message: 'Connection lost. Reconnecting in 5s...' });
             setTimeout(setupWebSocket, 5000);
         };
 
         ws.onerror = (error) => {
-            logToScreen({ level: 'ERROR', message: 'WebSocket error. See console for details.' });
+            logToScreen({ level: 'ERROR', message: 'WebSocket error. See console.' });
             console.error('WebSocket Error:', error);
         };
     };
 
     // --- Event Listeners ---
     startBtn.addEventListener('click', async () => {
-        logToScreen({ level: 'SYSTEM', message: 'Starting stress test...' });
+        logToScreen({ level: 'SYSTEM', message: 'Initiating task...' });
         const config = getFormData();
         try {
             await fetchAPI('/api/start', {
@@ -212,25 +236,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 headers: getHeaders(),
                 body: JSON.stringify(config),
             });
-            // UI update will be handled by the WebSocket push
-        } catch (error) {
-            // Error is already logged by fetchAPI
-        }
+        } catch (error) {}
     });
 
     stopBtn.addEventListener('click', async () => {
-        logToScreen({ level: 'SYSTEM', message: 'Stopping stress test...' });
+        logToScreen({ level: 'SYSTEM', message: 'Sending termination signal...' });
         try {
             await fetchAPI('/api/stop', {
                 method: 'POST',
                 headers: getHeaders(),
             });
-            // UI update will be handled by the WebSocket push
         } catch (error) {}
     });
 
     updateBtn.addEventListener('click', async () => {
-        logToScreen({ level: 'SYSTEM', message: 'Updating configuration...' });
+        logToScreen({ level: 'SYSTEM', message: 'Updating live configuration...' });
         const config = getFormData();
         try {
             await fetchAPI('/api/config', {
@@ -238,7 +258,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 headers: getHeaders(),
                 body: JSON.stringify(config),
             });
-            logToScreen({ level: 'SUCCESS', message: 'Configuration updated.' });
+            logToScreen({ level: 'SUCCESS', message: 'Live configuration updated.' });
         } catch (error) {}
     });
     
@@ -248,17 +268,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
     clearLogBtn.addEventListener('click', () => {
         logBox.innerHTML = '';
-        logToScreen({ level: 'SYSTEM', message: 'Logs cleared.' });
+        logToScreen({ level: 'SYSTEM', message: 'Log view cleared.' });
     });
 
     queryBtn.addEventListener('click', queryServer);
 
     // --- Initialization ---
     const init = () => {
-        logToScreen({ level: 'SYSTEM', message: 'Control panel initialized.' });
+        logToScreen({ level: 'SYSTEM', message: 'Mission Control UI initialized.' });
         setupWebSocket();
-        // Initial query on load
-        setTimeout(queryServer, 500);
+        // Initial query on load if host is set
+        if (document.getElementById('host').value) {
+            setTimeout(queryServer, 500);
+        }
     };
 
     init();
