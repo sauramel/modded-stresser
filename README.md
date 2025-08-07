@@ -94,6 +94,69 @@ The easiest way to run the system is with Docker Compose.
 
 ---
 
+## Manual Execution (Without Docker)
+
+For development or if you prefer not to use Docker, you can run the controller and actors directly on your machine.
+
+### Prerequisites
+- Python 3.7+
+- `pip` and `venv`
+
+### 1. Setup
+
+First, set up a Python virtual environment and install the required dependencies.
+
+```bash
+# Create a virtual environment
+python3 -m venv venv
+
+# Activate it
+# On macOS and Linux:
+source venv/bin/activate
+# On Windows:
+# venv\Scripts\activate
+
+# Install dependencies from the app directory
+pip install -r app/requirements.txt
+```
+
+### 2. Run the Controller
+
+Open a terminal, activate the virtual environment, and run the following command to start the controller:
+
+```bash
+# Set the mode and run the main script
+MODE=controller python app/main.py
+```
+The controller will start on `http://localhost:8000` by default. You can customize the host, port, and API key with environment variables:
+`API_KEY=my-secret-key LISTEN_PORT=8080 MODE=controller python app/main.py`
+
+### 3. Run Actors
+
+Open one or more new terminals to run the actor processes. **It is critical that each actor has a unique `ACTOR_ID`**.
+
+**Terminal 1 - Actor 1:**
+```bash
+# Activate the virtual environment first
+source venv/bin/activate
+
+# Run the first actor
+MODE=actor ACTOR_ID=manual-actor-01 python app/main.py
+```
+
+**Terminal 2 - Actor 2:**
+```bash
+# Activate the virtual environment first
+source venv/bin/activate
+
+# Run the second actor with a different ID
+MODE=actor ACTOR_ID=manual-actor-02 python app/main.py
+```
+
+The actors will automatically connect to the controller at `http://localhost:8000`. You can point them to a different controller using the `CONTROLLER_HOST` environment variable.
+
+---
+
 ## API Documentation
 
 The controller listens on port `8000`. All administrative endpoints under `/api/` require an API key to be sent in the `X-API-Key` header.
