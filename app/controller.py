@@ -1,6 +1,7 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends, HTTPException, status
 from fastapi.security import APIKeyHeader
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
 from pathlib import Path
@@ -63,6 +64,12 @@ async def get_api_key(key: str = Depends(api_key_header)):
 
 # --- FastAPI App ---
 app = FastAPI(title="Stresser Controller API", description="Controller for distributed stress tests.")
+
+# Mount static files for the web UI
+static_dir = Path(__file__).parent / "static"
+if static_dir.is_dir():
+    app.mount("/static", StaticFiles(directory=static_dir), name="static")
+
 
 # --- Actor-facing endpoints ---
 
@@ -153,3 +160,13 @@ async def websocket_endpoint(websocket: WebSocket):
     except WebSocketDisconnect:
         manager.disconnect(websocket)
         print("Client disconnected from WebSocket")
+
+# --- Web UI Endpoint ---
+
+@app.get("/", response_class=FileResponse)
+async def read_index():
+    """Serves the main index.html file for the web UI."""
+    index_path = Path(__file__).parent / "static" / "index.html"
+    if not index_path.is_file():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="index.html not found")
+    return FileResponse(index_path)

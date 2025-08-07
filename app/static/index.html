@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stresser Controller</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Stresser Control Panel</h1>
+            <div class="api-key-container">
+                <label for="apiKey">API Key:</label>
+                <input type="password" id="apiKey" placeholder="Enter your API key" value="you-should-really-change-this">
+            </div>
+        </header>
+
+        <main>
+            <div class="grid">
+                <!-- Status & Config -->
+                <div class="card">
+                    <h2><span id="status-indicator" class="indicator-stopped"></span> Status</h2>
+                    <p id="status-text">Idle</p>
+                    <div id="current-config">
+                        <h3>Current Configuration</h3>
+                        <ul>
+                            <li><strong>Host:</strong> <span id="config-host">N/A</span></li>
+                            <li><strong>Port:</strong> <span id="config-port">N/A</span></li>
+                            <li><strong>Threads:</strong> <span id="config-threads">N/A</span></li>
+                            <li><strong>Duration:</strong> <span id="config-duration">N/A</span>s</li>
+                            <li><strong>Mode:</strong> <code id="config-mode">N/A</code></li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Controls -->
+                <div class="card">
+                    <h2>Controls</h2>
+                    <form id="control-form">
+                        <div class="form-group">
+                            <label for="host">Target Host</label>
+                            <input type="text" id="host" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="port">Target Port</label>
+                            <input type="number" id="port" value="25565" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="threads">Threads</label>
+                            <input type="number" id="threads" value="200" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="duration">Duration (s)</label>
+                            <input type="number" id="duration" value="30" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="mode">Mode</label>
+                            <select id="mode" required>
+                                <option value="login_flood">Login Flood</option>
+                                <option value="modded_probe">Modded Probe</option>
+                                <option value="modded_replay">Modded Replay</option>
+                            </select>
+                        </div>
+                        <div class="button-group">
+                            <button type="button" id="start-btn" class="btn btn-start">Start</button>
+                            <button type="button" id="stop-btn" class="btn btn-stop">Stop</button>
+                            <button type="button" id="update-btn" class="btn btn-update">Update Config</button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Actors -->
+                <div class="card">
+                    <h2>Active Actors</h2>
+                    <p>Actors that have checked in recently.</p>
+                    <ul id="actor-list">
+                        <!-- Actors will be populated by JS -->
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Live Logs -->
+            <div class="card">
+                <h2>Live Logs</h2>
+                <div id="log-container">
+                    <pre id="log-box"></pre>
+                </div>
+            </div>
+        </main>
+    </div>
+    <script src="/static/script.js"></script>
+</body>
+</html>
