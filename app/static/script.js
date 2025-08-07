@@ -5,8 +5,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const statusText = document.getElementById('status-text');
     
     // Actor display
-    const actorCount = document.getElementById('actor-count');
-    const actorList = document.getElementById('actor-list');
+    const actorCountSummary = document.getElementById('actor-count-summary');
+    const actorListSummary = document.getElementById('actor-list-summary');
+    const actorCountDetailed = document.getElementById('actor-count-detailed');
+    const actorListDetailed = document.getElementById('actor-list-detailed');
     
     // Logs
     const logBox = document.getElementById('log-box');
@@ -21,7 +23,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const updateBtn = document.getElementById('update-btn');
     const exploitSelect = document.getElementById('exploit');
     
-    // Profiler View
+    // Profiler
     const profileBtn = document.getElementById('profile-btn');
     const profileHostInput = document.getElementById('profile-host');
     const profilePortInput = document.getElementById('profile-port');
@@ -31,15 +33,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const profileMotd = document.getElementById('profile-motd');
     const profilePlayers = document.getElementById('profile-players');
     const profileVersion = document.getElementById('profile-version');
-    const profileType = document.getElementById('profile-type');
-    const modListContainer = document.getElementById('mod-list-container');
-    const modCount = document.getElementById('mod-count');
-    const modList = document.getElementById('mod-list');
-
-    // Dashboard summary
-    const profileOnlineStatusSummary = document.getElementById('profile-online-status-summary');
-    const profileVersionSummary = document.getElementById('profile-version-summary');
-    const profilePlayersSummary = document.getElementById('profile-players-summary');
 
     // Exploit Library
     const exploitLibraryList = document.getElementById('exploit-library-list');
@@ -110,7 +103,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- UI Update Functions ---
     const updateStatusUI = (data) => {
-        // Main status
         if (data.running) {
             statusIndicatorDot.className = 'indicator-dot running';
             statusText.textContent = 'Task Running';
@@ -123,7 +115,6 @@ document.addEventListener('DOMContentLoaded', () => {
             stopBtn.disabled = true;
         }
         
-        // Task config form and details
         const config = data.task_config || {};
         document.getElementById('config-host').textContent = config.host || 'N/A';
         document.getElementById('config-port').textContent = config.port || 'N/A';
@@ -131,7 +122,6 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('config-threads').textContent = config.threads || 'N/A';
         document.getElementById('config-duration').textContent = config.duration || 'N/A';
         
-        // Pre-fill form if empty
         if (!form.host.value && config.host) form.host.value = config.host;
         if (form.port.value === "25565" && config.port) form.port.value = config.port;
         if (form.threads.value === "200" && config.threads) form.threads.value = config.threads;
@@ -143,18 +133,32 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const updateActorsUI = (actors) => {
         const actorIds = Object.keys(actors);
-        actorCount.textContent = actorIds.length;
-        actorList.innerHTML = '';
-        if (actorIds.length === 0) {
-            actorList.innerHTML = '<li>No actors have checked in.</li>';
+        const count = actorIds.length;
+        
+        actorCountSummary.textContent = count;
+        actorCountDetailed.textContent = count;
+        
+        actorListSummary.innerHTML = '';
+        actorListDetailed.innerHTML = '';
+
+        if (count === 0) {
+            const placeholder = '<li>No actors have checked in.</li>';
+            actorListSummary.innerHTML = placeholder;
+            actorListDetailed.innerHTML = placeholder;
             return;
         }
+
         actorIds.sort().forEach(id => {
             const actor = actors[id];
-            const li = document.createElement('li');
             const lastSeen = new Date(actor.last_seen).toLocaleString();
-            li.innerHTML = `<strong>${id.substring(0, 12)}...</strong><span>Last seen: ${lastSeen}</span>`;
-            actorList.appendChild(li);
+            
+            const summaryLi = document.createElement('li');
+            summaryLi.textContent = `${id.substring(0, 12)}...`;
+            actorListSummary.appendChild(summaryLi);
+
+            const detailedLi = document.createElement('li');
+            detailedLi.innerHTML = `<strong>${id.substring(0, 12)}...</strong><span>ID: ${id}</span><span>Last Seen: ${lastSeen}</span>`;
+            actorListDetailed.appendChild(detailedLi);
         });
     };
 
@@ -163,48 +167,22 @@ document.addEventListener('DOMContentLoaded', () => {
         serverStatusList.classList.remove('hidden');
 
         if (isOnline) {
-            // Main profiler view
             profileOnlineStatus.textContent = 'Online';
             profileOnlineStatus.style.color = 'var(--accent-success)';
-            profileMotd.innerHTML = data.motd.replace(/§./g, ''); // Basic color code stripping
+            profileMotd.innerHTML = data.motd.replace(/§./g, '');
             profilePlayers.textContent = `${data.players.online} / ${data.players.max}`;
             profileVersion.textContent = data.version.name;
-            profileType.textContent = data.type;
-
-            // Dashboard summary
-            profileOnlineStatusSummary.textContent = 'Online';
-            profileOnlineStatusSummary.style.color = 'var(--accent-success)';
-            profileVersionSummary.textContent = data.version.name;
-            profilePlayersSummary.textContent = `${data.players.online} / ${data.players.max}`;
-
-            if (data.mods && data.mods.length > 0) {
-                modListContainer.classList.remove('hidden');
-                modCount.textContent = data.mods.length;
-                modList.innerHTML = data.mods.map(mod => `<li>${mod.modid} (${mod.version})</li>`).join('');
-            } else {
-                modListContainer.classList.add('hidden');
-            }
-
         } else {
-            // Main profiler view
             profileOnlineStatus.textContent = 'Offline';
             profileOnlineStatus.style.color = 'var(--accent-danger)';
             profileMotd.textContent = data.error || 'Failed to connect.';
             profilePlayers.textContent = 'N/A';
             profileVersion.textContent = 'N/A';
-            profileType.textContent = 'N/A';
-            modListContainer.classList.add('hidden');
-
-            // Dashboard summary
-            profileOnlineStatusSummary.textContent = 'Offline';
-            profileOnlineStatusSummary.style.color = 'var(--accent-danger)';
-            profileVersionSummary.textContent = 'N/A';
-            profilePlayersSummary.textContent = 'N/A';
         }
     };
 
     const logToScreen = (logData) => {
-        if (!logContainer) return; // Guard against errors if element not found
+        if (!logContainer) return;
         const timestamp = new Date(logData.timestamp || Date.now()).toLocaleTimeString();
         const line = document.createElement('span');
         line.classList.add('log-line');
@@ -238,13 +216,13 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const exploits = await fetchAPI('/api/exploits', { headers: getHeaders() });
             
-            // Populate attack form dropdown
             exploitSelect.innerHTML = '';
             const categories = {};
             exploits.forEach(exploit => {
                 if (!categories[exploit.category]) categories[exploit.category] = [];
                 categories[exploit.category].push(exploit);
             });
+
             for (const category in categories) {
                 const optgroup = document.createElement('optgroup');
                 optgroup.label = category;
@@ -258,7 +236,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 exploitSelect.appendChild(optgroup);
             }
 
-            // Populate exploit library view
             exploitLibraryList.innerHTML = '';
              for (const category in categories) {
                 const categoryDiv = document.createElement('div');
@@ -285,11 +262,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- SPA Navigation ---
     const switchView = (viewName) => {
-        views.forEach(view => view.classList.add('hidden'));
-        const targetView = document.getElementById(`${viewName}-view`);
-        if (targetView) {
-            targetView.classList.remove('hidden');
-        }
+        views.forEach(view => {
+            if (view.id === `${viewName}-view`) {
+                view.style.display = view.id === 'dashboard-view' ? 'grid' : 'block';
+            } else {
+                view.style.display = 'none';
+            }
+        });
 
         navItems.forEach(item => {
             if (item.dataset.view === viewName) {
@@ -345,21 +324,14 @@ document.addEventListener('DOMContentLoaded', () => {
         logToScreen({ level: 'SYSTEM', message: 'Initiating task...' });
         const config = getFormData();
         try {
-            await fetchAPI('/api/start', {
-                method: 'POST',
-                headers: getHeaders(),
-                body: JSON.stringify(config),
-            });
+            await fetchAPI('/api/start', { method: 'POST', headers: getHeaders(), body: JSON.stringify(config) });
         } catch (error) {}
     });
 
     stopBtn.addEventListener('click', async () => {
         logToScreen({ level: 'SYSTEM', message: 'Sending termination signal...' });
         try {
-            await fetchAPI('/api/stop', {
-                method: 'POST',
-                headers: getHeaders(),
-            });
+            await fetchAPI('/api/stop', { method: 'POST', headers: getHeaders() });
         } catch (error) {}
     });
 
@@ -367,11 +339,7 @@ document.addEventListener('DOMContentLoaded', () => {
         logToScreen({ level: 'SYSTEM', message: 'Updating live configuration...' });
         const config = getFormData();
         try {
-            await fetchAPI('/api/config', {
-                method: 'PUT',
-                headers: getHeaders(),
-                body: JSON.stringify(config),
-            });
+            await fetchAPI('/api/config', { method: 'PUT', headers: getHeaders(), body: JSON.stringify(config) });
             logToScreen({ level: 'SUCCESS', message: 'Live configuration updated.' });
         } catch (error) {}
     });
@@ -389,7 +357,10 @@ document.addEventListener('DOMContentLoaded', () => {
     profileBtn.addEventListener('click', profileServer);
 
     navItems.forEach(item => {
-        item.addEventListener('click', () => switchView(item.dataset.view));
+        item.addEventListener('click', (e) => {
+            e.preventDefault();
+            switchView(item.dataset.view)
+        });
     });
 
     // --- Initialization ---
@@ -397,9 +368,8 @@ document.addEventListener('DOMContentLoaded', () => {
         logToScreen({ level: 'SYSTEM', message: 'Voidout UI initialized.' });
         setupWebSocket();
         populateExploits();
-        switchView('dashboard'); // Set initial view
+        switchView('dashboard');
         
-        // Auto-fill profiler from dashboard form if empty
         profileHostInput.value = document.getElementById('host').value;
         profilePortInput.value = document.getElementById('port').value;
     };

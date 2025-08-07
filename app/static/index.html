@@ -16,7 +16,6 @@
             </div>
             <nav class="nav-menu">
                 <a class="nav-item active" data-view="dashboard"><i class="fas fa-tachometer-alt"></i><span>Dashboard</span></a>
-                <a class="nav-item" data-view="profiler"><i class="fas fa-search-location"></i><span>Target Profiler</span></a>
                 <a class="nav-item" data-view="exploits"><i class="fas fa-bomb"></i><span>Exploit Library</span></a>
                 <a class="nav-item" data-view="actors"><i class="fas fa-users"></i><span>Actor Management</span></a>
             </nav>
@@ -35,9 +34,9 @@
                 </div>
             </header>
 
-            <div class="content-area">
+            <div class="content-wrapper">
                 <!-- =================================================================
-                DASHBOARD VIEW
+                DASHBOARD VIEW (Restored Layout)
                 ================================================================== -->
                 <div class="view" id="dashboard-view">
                     <div class="control-column">
@@ -110,65 +109,41 @@
                         </div>
                         <div class="card">
                             <div class="card-header">
-                                <h3><i class="fas fa-info-circle"></i> Last Profiled Target</h3>
-                            </div>
-                            <ul id="server-status-list-summary">
-                                <li><strong>Status</strong><span id="profile-online-status-summary">N/A</span></li>
-                                <li><strong>Version</strong><span id="profile-version-summary">N/A</span></li>
-                                <li><strong>Players</strong><span id="profile-players-summary">N/A</span></li>
-                            </ul>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- =================================================================
-                PROFILER VIEW
-                ================================================================== -->
-                <div class="view hidden" id="profiler-view">
-                    <div class="control-column">
-                        <div class="card">
-                            <div class="card-header">
-                                <h3><i class="fas fa-search-location"></i> Profile a Server</h3>
+                                <h3><i class="fas fa-search-location"></i> Target Profiler</h3>
                             </div>
                             <form id="profile-form">
-                                <div class="form-grid" style="grid-template-columns: 2fr 1fr;">
-                                    <div class="form-group">
-                                        <label for="profile-host">Target Host</label>
-                                        <input type="text" id="profile-host" required placeholder="e.g., mc.hypixel.net">
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="profile-port">Target Port</label>
-                                        <input type="number" id="profile-port" value="25565" required>
-                                    </div>
+                                <div class="form-group">
+                                    <label for="profile-host">Target Host</label>
+                                    <input type="text" id="profile-host" required placeholder="e.g., mc.hypixel.net">
                                 </div>
-                                <div class="button-group">
-                                    <button type="button" id="profile-btn" class="btn btn-primary"><i class="fas fa-crosshairs"></i> Profile</button>
+                                <div class="form-group">
+                                    <label for="profile-port">Target Port</label>
+                                    <input type="number" id="profile-port" value="25565" required>
+                                </div>
+                                <div class="button-group" style="margin-top: 1rem;">
+                                    <button type="button" id="profile-btn" class="btn btn-primary" style="width: 100%;"><i class="fas fa-crosshairs"></i> Profile</button>
                                 </div>
                             </form>
-                        </div>
-                    </div>
-                    <div class="info-column">
-                        <div class="card">
-                            <div class="card-header">
-                                <h3><i class="fas fa-server"></i> Server Profile Result</h3>
-                            </div>
                             <div id="server-status">
-                                <p id="profile-status-text">Enter host/port and click Profile.</p>
+                                <p id="profile-status-text" style="margin-top: 1rem;">Profile results will appear here.</p>
                                 <ul id="server-status-list" class="hidden">
                                     <li><strong>Status</strong><span id="profile-online-status"></span></li>
                                     <li><strong>Version</strong><span id="profile-version"></span></li>
-                                    <li><strong>Type</strong><span id="profile-type"></span></li>
                                     <li><strong>Players</strong><span id="profile-players"></span></li>
                                     <li style="flex-direction: column; align-items: flex-start;">
                                         <strong>MOTD</strong>
                                         <pre id="profile-motd"></pre>
                                     </li>
                                 </ul>
-                                <div id="mod-list-container" class="hidden" style="margin-top: 1rem;">
-                                    <h4><i class="fas fa-box-open"></i> Mods (<span id="mod-count">0</span>)</h4>
-                                    <ul id="mod-list" class="compact-list"></ul>
-                                </div>
                             </div>
+                        </div>
+                         <div class="card">
+                            <div class="card-header">
+                                <h3><i class="fas fa-users"></i> Active Actors (<span id="actor-count-summary">0</span>)</h3>
+                            </div>
+                            <ul id="actor-list-summary" class="actor-list">
+                                <li>No actors have checked in.</li>
+                            </ul>
                         </div>
                     </div>
                 </div>
@@ -193,9 +168,9 @@
                 <div class="view hidden" id="actors-view">
                     <div class="card" style="flex: 1;">
                         <div class="card-header">
-                            <h3><i class="fas fa-users"></i> Active Actors (<span id="actor-count">0</span>)</h3>
+                            <h3><i class="fas fa-users"></i> Active Actors (<span id="actor-count-detailed">0</span>)</h3>
                         </div>
-                        <ul id="actor-list" class="actor-list-detailed">
+                        <ul id="actor-list-detailed" class="actor-list-detailed">
                             <li>No actors have checked in.</li>
                         </ul>
                     </div>
