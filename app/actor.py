@@ -1,7 +1,7 @@
 import requests
 import time
-from config import CONTROLLER_HOST, ACTOR_ID
-from stress import run_stress, probe_modlist
+from .config import CONTROLLER_HOST, ACTOR_ID
+from .stress import run_stress, probe_modlist
 
 def actor_loop():
     while True:
