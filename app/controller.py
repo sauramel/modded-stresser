@@ -1,7 +1,6 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends, HTTPException, status
 from fastapi.security import APIKeyHeader
 from fastapi.responses import FileResponse, JSONResponse
-from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
 from pathlib import Path
@@ -39,7 +38,7 @@ state: Dict[str, Any] = {
         "exploit_args": {}
     },
     "actors": {},
-    "profile_cache": {} # Cache for target profile data
+    "profile_cache": {} # Cache for target profile data, keyed by "host:port"
 }
 
 # --- Connection Manager for WebSockets ---
@@ -123,7 +122,7 @@ async def post_log(data: dict):
 
 @app.get("/api/exploits", dependencies=[Depends(get_api_key)])
 def list_exploits():
-    """Lists all available exploit modules."""
+    """Lists all available exploit modules with their required arguments."""
     exploits = get_all_exploits()
     return [
         {
@@ -131,26 +130,31 @@ def list_exploits():
             "name": ex.name,
             "description": ex.description,
             "category": ex.category,
-            "disabled": False # Future use
+            "requires_forge": ex.requires_forge,
+            "args": ex.args,
         }
         for ex in exploits
     ]
 
 @app.post("/api/profile", dependencies=[Depends(get_api_key)])
-async def profile_server(req: ProfileRequest):
+async def profile_server_endpoint(req: ProfileRequest):
     """Profiles a Minecraft server for detailed information."""
     try:
         await broadcast_log({"level": "SYSTEM", "message": f"Profiling {req.host}:{req.port}..."})
         profile_data = await profiler.profile_server(req.host, req.port, req.timeout)
-        state["profile_cache"][f"{req.host}:{req.port}"] = profile_data
-        await broadcast_log({"level": "SUCCESS", "message": f"Profiling complete. Server Type: {profile_data['type']}"})
+        
+        profile_key = f"{req.host}:{req.port}"
+        state["profile_cache"][profile_key] = profile_data
+        
+        await broadcast_log({"level": "SUCCESS", "message": f"Profiling complete. Server Type: {profile_data.get('type', 'Unknown')}"})
         return profile_data
-    except Exception as e:
+    except profiler.ConnectionError as e:
         await broadcast_log({"level": "ERROR", "message": f"Failed to profile server: {e}"})
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content={"error": f"Failed to profile server: {e}"}
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except Exception as e:
+        await broadcast_log({"level": "ERROR", "message": f"An unexpected error occurred during profiling: {e}"})
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"An unexpected error occurred: {e}")
+
 
 @app.post("/api/start", dependencies=[Depends(get_api_key)])
 async def start_task(config: TaskConfig):
@@ -163,40 +167,48 @@ async def start_task(config: TaskConfig):
 
     state["task_config"] = config.dict()
     
-    # If exploit requires special data (e.g., modlist), prepare it
+    # If exploit requires special data (e.g., modlist), check the cache.
+    # The new design requires the user to profile the server MANUALLY first.
     if exploit_module.requires_forge:
         profile_key = f"{config.host}:{config.port}"
-        if profile_key not in state["profile_cache"] or state["profile_cache"][profile_key].get("type") != "Forge":
-             await broadcast_log({"level": "SYSTEM", "message": f"'{exploit_module.name}' requires Forge. Profiling target..."})
-             try:
-                profile_data = await profiler.profile_server(config.host, config.port)
-                state["profile_cache"][profile_key] = profile_data
-                if profile_data.get("type") != "Forge":
-                    raise HTTPException(status_code=400, detail=f"Exploit requires Forge, but target is {profile_data.get('type')}.")
-             except Exception as e:
-                await broadcast_log({"level": "ERROR", "message": f"Failed to auto-profile for Forge modlist: {e}. Aborting."})
-                raise HTTPException(status_code=400, detail=f"Failed to auto-profile for Forge modlist: {e}")
+        if profile_key not in state["profile_cache"]:
+            detail = f"Exploit '{exploit_module.name}' requires Forge data. Please profile the target server first."
+            await broadcast_log({"level": "ERROR", "message": detail})
+            raise HTTPException(status_code=400, detail=detail)
+        
+        cached_profile = state["profile_cache"][profile_key]
+        if cached_profile.get("type") != "Forge":
+            detail = f"Exploit requires Forge, but the cached profile for the target is '{cached_profile.get('type', 'Unknown')}'. Please re-profile."
+            await broadcast_log({"level": "ERROR", "message": detail})
+            raise HTTPException(status_code=400, detail=detail)
         
         # Add modlist to exploit args for the actor
-        state["task_config"]["exploit_args"]["mod_data"] = state["profile_cache"][profile_key]
+        state["task_config"]["exploit_args"]["mod_data"] = cached_profile
 
 
     state["running"] = True
     await broadcast_status_update()
+    await broadcast_log({"level": "SYSTEM", "message": f"Task '{exploit_module.name}' started against {config.host}:{config.port}."})
     return {"status": "Task started", "config": state["task_config"]}
 
 @app.post("/api/stop", dependencies=[Depends(get_api_key)])
 async def stop_task():
     state["running"] = False
     await broadcast_status_update()
+    await broadcast_log({"level": "SYSTEM", "message": "Termination signal sent. Actors will stop on next check-in."})
     return {"status": "Task stopped"}
 
 @app.put("/api/config", dependencies=[Depends(get_api_key)])
 async def update_config(config: TaskConfig):
+    if state["running"]:
+        raise HTTPException(status_code=400, detail="Cannot update configuration while a task is running. Please stop the task first.")
+        
     if not get_exploit_by_id(config.exploit):
         raise HTTPException(status_code=404, detail=f"Exploit '{config.exploit}' not found.")
+    
     state["task_config"] = config.dict()
     await broadcast_status_update()
+    await broadcast_log({"level": "SUCCESS", "message": "Idle task configuration updated."})
     return {"status": "Configuration updated", "new_config": state["task_config"]}
 
 # --- WebSocket Endpoint ---
@@ -207,6 +219,7 @@ async def websocket_endpoint(websocket: WebSocket):
     await websocket.send_text(json.dumps({"type": "status_update", "payload": state}, default=str))
     try:
         while True:
+            # Keep connection alive
             await websocket.receive_text()
     except WebSocketDisconnect:
         manager.disconnect(websocket)

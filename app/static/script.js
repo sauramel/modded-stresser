@@ -1,29 +1,29 @@
 document.addEventListener('DOMContentLoaded', () => {
+    // --- State ---
+    let exploitsData = []; // Cache for exploit metadata including args
+
     // --- DOM Elements ---
     const apiKeyInput = document.getElementById('apiKey');
     const statusIndicatorDot = document.getElementById('status-indicator-dot');
     const statusText = document.getElementById('status-text');
     
-    // Actor display
     const actorCountSummary = document.getElementById('actor-count-summary');
     const actorListSummary = document.getElementById('actor-list-summary');
     const actorCountDetailed = document.getElementById('actor-count-detailed');
     const actorListDetailed = document.getElementById('actor-list-detailed');
     
-    // Logs
     const logBox = document.getElementById('log-box');
     const logContainer = document.getElementById('log-container');
     const pauseScrollCheckbox = document.getElementById('pause-scroll');
     const clearLogBtn = document.getElementById('clear-log-btn');
     
-    // Main Attack Form
     const form = document.getElementById('control-form');
     const startBtn = document.getElementById('start-btn');
     const stopBtn = document.getElementById('stop-btn');
     const updateBtn = document.getElementById('update-btn');
     const exploitSelect = document.getElementById('exploit');
+    const exploitArgsContainer = document.getElementById('exploit-args-container');
     
-    // Profiler
     const profileBtn = document.getElementById('profile-btn');
     const profileHostInput = document.getElementById('profile-host');
     const profilePortInput = document.getElementById('profile-port');
@@ -34,10 +34,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const profilePlayers = document.getElementById('profile-players');
     const profileVersion = document.getElementById('profile-version');
 
-    // Exploit Library
     const exploitLibraryList = document.getElementById('exploit-library-list');
 
-    // Navigation
     const navItems = document.querySelectorAll('.nav-item');
     const views = document.querySelectorAll('.view');
     const viewTitle = document.getElementById('view-title');
@@ -54,9 +52,9 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const response = await fetch(`${API_BASE}${endpoint}`, options);
             if (!response.ok) {
-                const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
-                logToScreen({ level: 'ERROR', message: `API Error: ${errorData.detail || `HTTP ${response.status}`}` });
-                throw new Error(errorData.detail || `HTTP ${response.status}`);
+                const errorData = await response.json().catch(() => ({ detail: `HTTP ${response.status}` }));
+                logToScreen({ level: 'ERROR', message: `API Error: ${errorData.detail}` });
+                throw new Error(errorData.detail);
             }
             return response.json();
         } catch (error) {
@@ -93,13 +91,22 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    const getFormData = () => ({
-        host: document.getElementById('host').value,
-        port: parseInt(document.getElementById('port').value, 10),
-        threads: parseInt(document.getElementById('threads').value, 10),
-        duration: parseInt(document.getElementById('duration').value, 10),
-        exploit: exploitSelect.value,
-    });
+    const getFormData = () => {
+        const exploitArgs = {};
+        const argInputs = exploitArgsContainer.querySelectorAll('input, select');
+        argInputs.forEach(input => {
+            exploitArgs[input.name] = input.value;
+        });
+
+        return {
+            host: document.getElementById('host').value,
+            port: parseInt(document.getElementById('port').value, 10),
+            threads: parseInt(document.getElementById('threads').value, 10),
+            duration: parseInt(document.getElementById('duration').value, 10),
+            exploit: exploitSelect.value,
+            exploit_args: exploitArgs,
+        };
+    };
 
     // --- UI Update Functions ---
     const updateStatusUI = (data) => {
@@ -108,11 +115,13 @@ document.addEventListener('DOMContentLoaded', () => {
             statusText.textContent = 'Task Running';
             startBtn.disabled = true;
             stopBtn.disabled = false;
+            updateBtn.disabled = true;
         } else {
             statusIndicatorDot.className = 'indicator-dot stopped';
             statusText.textContent = 'Idle';
             startBtn.disabled = false;
             stopBtn.disabled = true;
+            updateBtn.disabled = false;
         }
         
         const config = data.task_config || {};
@@ -128,6 +137,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (form.duration.value === "60" && config.duration) form.duration.value = config.duration;
         if (config.exploit && exploitSelect.querySelector(`option[value="${config.exploit}"]`)) {
             exploitSelect.value = config.exploit;
+            renderExploitArgs(config.exploit);
         }
     };
 
@@ -212,13 +222,47 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
+    const renderExploitArgs = (exploitId) => {
+        exploitArgsContainer.innerHTML = '';
+        const exploit = exploitsData.find(e => e.id === exploitId);
+        if (!exploit || !exploit.args || exploit.args.length === 0) {
+            return;
+        }
+
+        const argsGrid = document.createElement('div');
+        argsGrid.className = 'form-grid';
+        argsGrid.style.marginTop = '1.25rem';
+        argsGrid.style.paddingTop = '1.25rem';
+        argsGrid.style.borderTop = '1px solid var(--border-color)';
+
+        exploit.args.forEach(arg => {
+            const formGroup = document.createElement('div');
+            formGroup.className = 'form-group';
+
+            const label = document.createElement('label');
+            label.htmlFor = `arg-${arg.name}`;
+            label.textContent = arg.label || arg.name;
+            formGroup.appendChild(label);
+
+            const input = document.createElement('input');
+            input.type = arg.type || 'text';
+            input.id = `arg-${arg.name}`;
+            input.name = arg.name;
+            input.value = arg.default || '';
+            formGroup.appendChild(input);
+            
+            argsGrid.appendChild(formGroup);
+        });
+        exploitArgsContainer.appendChild(argsGrid);
+    };
+
     const populateExploits = async () => {
         try {
-            const exploits = await fetchAPI('/api/exploits', { headers: getHeaders() });
+            exploitsData = await fetchAPI('/api/exploits', { headers: getHeaders() });
             
             exploitSelect.innerHTML = '';
             const categories = {};
-            exploits.forEach(exploit => {
+            exploitsData.forEach(exploit => {
                 if (!categories[exploit.category]) categories[exploit.category] = [];
                 categories[exploit.category].push(exploit);
             });
@@ -248,10 +292,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 categories[category].forEach(exploit => {
                     const item = document.createElement('li');
                     item.innerHTML = `<strong>${exploit.name}</strong><p>${exploit.description}</p>`;
+                    if (exploit.requires_forge) {
+                        item.innerHTML += `<span class="badge-forge">Requires Forge</span>`;
+                    }
                     list.appendChild(item);
                 });
                 categoryDiv.appendChild(list);
                 exploitLibraryList.appendChild(categoryDiv);
+            }
+            
+            // Render args for the initially selected exploit
+            if (exploitSelect.value) {
+                renderExploitArgs(exploitSelect.value);
             }
 
         } catch (error) {
@@ -263,20 +315,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- SPA Navigation ---
     const switchView = (viewName) => {
         views.forEach(view => {
-            if (view.id === `${viewName}-view`) {
-                // The dashboard is a grid, others are blocks
-                view.style.display = view.id === 'dashboard-view' ? 'grid' : 'flex';
-            } else {
-                view.style.display = 'none';
-            }
+            view.style.display = view.id === `${viewName}-view` ? (view.id === 'dashboard-view' ? 'grid' : 'flex') : 'none';
         });
-
         navItems.forEach(item => {
+            item.classList.toggle('active', item.dataset.view === viewName);
             if (item.dataset.view === viewName) {
-                item.classList.add('active');
                 viewTitle.textContent = item.querySelector('span').textContent;
-            } else {
-                item.classList.remove('active');
             }
         });
     };
@@ -300,12 +344,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     case 'log':
                         logToScreen(data.payload);
                         break;
-                    default:
-                        logToScreen({ level: 'WARN', message: `Unknown WS message type: ${data.type}` });
                 }
             } catch (e) {
                 logToScreen({ level: 'ERROR', message: 'Failed to parse WebSocket message.' });
-                console.error("WS Parse Error:", e, event.data);
             }
         };
 
@@ -313,19 +354,14 @@ document.addEventListener('DOMContentLoaded', () => {
             logToScreen({ level: 'WARN', message: 'Connection lost. Reconnecting in 5s...' });
             setTimeout(setupWebSocket, 5000);
         };
-
-        ws.onerror = (error) => {
-            logToScreen({ level: 'ERROR', message: 'WebSocket error. See console.' });
-            console.error('WebSocket Error:', error);
-        };
+        ws.onerror = () => logToScreen({ level: 'ERROR', message: 'WebSocket connection error.' });
     };
 
     // --- Event Listeners ---
     startBtn.addEventListener('click', async () => {
         logToScreen({ level: 'SYSTEM', message: 'Initiating task...' });
-        const config = getFormData();
         try {
-            await fetchAPI('/api/start', { method: 'POST', headers: getHeaders(), body: JSON.stringify(config) });
+            await fetchAPI('/api/start', { method: 'POST', headers: getHeaders(), body: JSON.stringify(getFormData()) });
         } catch (error) {}
     });
 
@@ -337,11 +373,9 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     updateBtn.addEventListener('click', async () => {
-        logToScreen({ level: 'SYSTEM', message: 'Updating live configuration...' });
-        const config = getFormData();
+        logToScreen({ level: 'SYSTEM', message: 'Updating idle configuration...' });
         try {
-            await fetchAPI('/api/config', { method: 'PUT', headers: getHeaders(), body: JSON.stringify(config) });
-            logToScreen({ level: 'SUCCESS', message: 'Live configuration updated.' });
+            await fetchAPI('/api/config', { method: 'PUT', headers: getHeaders(), body: JSON.stringify(getFormData()) });
         } catch (error) {}
     });
     
@@ -349,6 +383,8 @@ document.addEventListener('DOMContentLoaded', () => {
         logToScreen({ level: 'SYSTEM', message: 'API Key updated. Reloading exploits...' });
         populateExploits();
     });
+
+    exploitSelect.addEventListener('change', (e) => renderExploitArgs(e.target.value));
 
     clearLogBtn.addEventListener('click', () => {
         logBox.innerHTML = '';
@@ -371,7 +407,6 @@ document.addEventListener('DOMContentLoaded', () => {
         populateExploits();
         switchView('dashboard');
         
-        // Sync profiler inputs with main form inputs on load
         profileHostInput.value = document.getElementById('host').value;
         profilePortInput.value = document.getElementById('port').value;
     };

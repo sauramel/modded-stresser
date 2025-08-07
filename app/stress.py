@@ -1,131 +1,67 @@
 import threading
 import time
-from collections import defaultdict
 from .exploits import get_exploit_by_id
 
-# --- Statistics and Reporting ---
-
-class StressStats:
-    """A thread-safe class to hold statistics for a stress test run."""
-    def __init__(self):
-        self.lock = threading.Lock()
-        self.counters = defaultdict(int)
-        self.start_time = time.time()
-
-    def increment(self, key, value=1):
-        with self.lock:
-            self.counters[key] += value
-
-    def get_stats(self):
-        with self.lock:
-            stats_copy = self.counters.copy()
-        return stats_copy
-
-def reporter_thread(stats, log_callback, stop_time, exploit_name):
-    """Periodically reports stats using the provided callback."""
-    if not log_callback:
-        return
-        
-    last_reported_stats = stats.get_stats()
-    
-    while time.time() < stop_time:
-        time.sleep(2)
-        if time.time() >= stop_time:
-            break
-
-        current_stats = stats.get_stats()
-        
-        # Generic reporting based on common keys
-        summary_parts = []
-        rate_keys = {
-            'packets_sent': 'Packets',
-            'joins_succeeded': 'Joins',
-            'messages_sent': 'Messages',
-            'connections_made': 'Connections'
-        }
-
-        for key, name in rate_keys.items():
-            if key in current_stats:
-                interval_count = current_stats.get(key, 0) - last_reported_stats.get(key, 0)
-                rate = round(interval_count / 2, 1)
-                summary_parts.append(f"{name}: {current_stats[key]} (~{rate}/s)")
-
-        if 'joins_failed' in current_stats:
-            summary_parts.append(f"Fails: {current_stats['joins_failed']}")
-        if 'errors' in current_stats:
-            summary_parts.append(f"Errors: {current_stats['errors']}")
-
-        if summary_parts:
+def worker(exploit_instance, end_time, log_callback):
+    """The function each thread will execute."""
+    while time.time() < end_time:
+        try:
+            exploit_instance.run(log_callback)
+        except Exception as e:
             log_callback({
-                "level": "INFO",
-                "message": f"Progress: {', '.join(summary_parts)}"
+                "level": "ERROR",
+                "message": f"Exploit thread crashed: {e}"
             })
-        
-        last_reported_stats = current_stats
+            # Optional: break the loop if a thread fails
+            break
+        # Optional: add a small delay between runs within a thread
+        time.sleep(0.1)
 
-# --- Main Orchestrator ---
-
-def run_exploit(task: dict, log_callback=None):
+def run_exploit(task: dict, log_callback):
     """
-    Initializes and runs the specified exploit module.
+    Initializes and runs the specified exploit with multiple threads.
     """
     exploit_id = task.get("exploit")
-    exploit_module = get_exploit_by_id(exploit_id)
-
-    if not exploit_module:
-        if log_callback:
-            log_callback({"level": "ERROR", "message": f"Unknown exploit ID '{exploit_id}' received."})
+    if not exploit_id:
+        log_callback({"level": "FATAL", "message": "No exploit ID provided in task."})
         return
 
-    ip = task['host']
-    port = task['port']
-    threads = task['threads']
-    duration = task['duration']
-    exploit_args = task.get('exploit_args', {})
+    exploit_class = get_exploit_by_id(exploit_id)
+    if not exploit_class:
+        log_callback({"level": "FATAL", "message": f"Could not find exploit class for ID: {exploit_id}"})
+        return
 
-    stop_time = time.time() + duration
-    stats = StressStats()
-    
-    if log_callback:
-        log_callback({"level": "SYSTEM", "message": f"Starting exploit '{exploit_module.name}' on {ip}:{port} for {duration}s"})
-    
-    # Instantiate the exploit with all necessary context
-    exploit_instance = exploit_module(
-        host=ip,
-        port=port,
-        stop_time=stop_time,
-        stats=stats,
-        log_callback=log_callback,
-        exploit_args=exploit_args
-    )
+    try:
+        # Instantiate the exploit with all necessary parameters
+        exploit_instance = exploit_class(
+            target_host=task.get("host"),
+            target_port=task.get("port"),
+            duration=task.get("duration"),
+            **task.get("exploit_args", {})
+        )
+    except Exception as e:
+        log_callback({"level": "FATAL", "message": f"Failed to initialize exploit {exploit_id}: {e}"})
+        return
 
-    worker_threads = []
-    for _ in range(threads):
-        # The 'run' method of the exploit class contains the worker loop
-        thread = threading.Thread(target=exploit_instance.run, daemon=True)
-        worker_threads.append(thread)
+    threads = []
+    num_threads = task.get("threads", 1)
+    duration = task.get("duration", 60)
+    end_time = time.time() + duration
+
+    log_callback({
+        "level": "SYSTEM",
+        "message": f"Starting {num_threads} threads for exploit '{exploit_instance.name}' for {duration} seconds."
+    })
+
+    for _ in range(num_threads):
+        thread = threading.Thread(target=worker, args=(exploit_instance, end_time, log_callback))
+        threads.append(thread)
         thread.start()
 
-    reporter = None
-    if log_callback:
-        reporter = threading.Thread(target=reporter_thread, args=(stats, log_callback, stop_time, exploit_module.name), daemon=True)
-        reporter.start()
-
-    for thread in worker_threads:
+    for thread in threads:
         thread.join()
 
-    if reporter:
-        reporter.join(timeout=0.1)
-
-    if log_callback:
-        final_stats = stats.get_stats()
-        elapsed = time.time() - stats.start_time
-        
-        summary_parts = []
-        for key, value in final_stats.items():
-            summary_parts.append(f"{key.replace('_', ' ').title()}: {value}")
-
-        log_callback({
-            "level": "SUCCESS",
-            "message": f"Task finished. Final Stats: {', '.join(summary_parts)}"
-        })
+    log_callback({
+        "level": "SYSTEM",
+        "message": f"Exploit '{exploit_instance.name}' has finished."
+    })
