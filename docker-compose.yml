@@ -12,6 +12,7 @@ services:
     environment:
       - MODE=controller
       - API_KEY=you-should-really-change-this
+      - LISTEN_HOST=0.0.0.0
       - LISTEN_PORT=8000
     command: python main.py
 
@@ -26,7 +27,9 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     deploy:
-      replicas: 3 # Default number of actors, scale with `docker-compose up --scale actor=N`
+      # This defines the default number of actors.
+      # Scale on the command line with: docker-compose up --scale actor=N
+      replicas: 3
     environment:
       - MODE=actor
       - CONTROLLER_HOST=http://controller:8000

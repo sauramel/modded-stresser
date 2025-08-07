@@ -1,8 +1,8 @@
-# Minecraft Server Stresser
+# Modular Exploit Framework
 
-A distributed, containerized stress testing tool for Minecraft server networks. This tool is designed to simulate various types of client connection loads to test server performance, plugin stability, and proxy configurations under pressure.
+A professional-grade, distributed, and containerized framework for testing Minecraft server network resilience. This tool has been architected for extensibility, allowing for the rapid development and deployment of new exploit modules.
 
-It operates on a controller/actor model. The `controller` provides a REST API, a WebSocket endpoint, and a web UI to manage and monitor the test. Multiple `actor` nodes carry out the actual stress tests by polling the controller for tasks.
+It operates on a controller/actor model. The `controller` provides a REST API, a WebSocket endpoint, and a web UI to manage and monitor operations. Multiple `actor` nodes carry out the actual tasks by polling the controller.
 
 ---
 
@@ -16,30 +16,29 @@ The use of this software to attack, disrupt, or gain unauthorized access to any 
 
 ---
 
-## Features
+## Core Features
 
-- **Distributed Architecture**: Scale your tests by deploying multiple actor nodes.
-- **Web UI Control Panel**: Modern, responsive web interface to start, stop, configure, and monitor tests.
-- **Live Server Query**: Fetches and displays live server status (MOTD, players, version) using the `mcquery` protocol.
-- **Real-time Log Streaming**: A WebSocket endpoint provides a live, color-coded feed of logs from all actors.
-- **Unique Actor IDs**: Actors automatically get unique IDs from their container hostnames for easy identification.
-- **Multiple Attack Modes**: Simulate different types of load on your server.
-- **Containerized**: Easily deploy the entire system using Docker and Docker Compose.
+- **Modular Exploit Engine**: Gone are the days of hardcoded attacks. The framework now features a dynamic exploit loader. Each exploit is a self-contained Python class in the `app/exploits/` directory, allowing for easy creation of new, complex modules.
+- **Advanced Target Profiler**: Before engaging a target, the framework can run a detailed profile to fingerprint the server. It identifies the server type (Vanilla, Forge, etc.), version, and can enumerate the complete mod list on Forge servers.
+- **Distributed Architecture**: Scale your operations by deploying multiple `actor` nodes. The system is designed for horizontal scaling via Docker Compose.
+- **Web UI Mission Control**: A modern, responsive web interface to profile targets, select and configure exploit modules, and monitor operations in real-time.
+- **Live Log Streaming**: A WebSocket endpoint provides a live, color-coded feed of logs from the controller and all connected actors.
+- **Dynamic UI**: The UI is not static. It dynamically fetches the list of available exploits from the controller's API, ensuring the frontend always reflects the backend's capabilities.
 
 ---
 
-## Attack Modes
+## Exploit Engine
 
-This tool is most effective against servers in **offline mode** (where player accounts are not authenticated with Mojang).
+The power of this framework lies in its modularity. To create a new exploit, simply add a new Python file to the `app/exploits/` directory containing a class that inherits from `exploits.base.Exploit`.
 
-| Mode              | Description                                                                                             | Intensity | Use Case                                                              |
-| ----------------- | ------------------------------------------------------------------------------------------------------- | --------- | --------------------------------------------------------------------- |
-| `login_flood`     | The standard attack. A large number of bots attempt to join the server and then disconnect.             | Medium    | Testing raw connection handling and player login processing.          |
-| `join_spam`       | Bots connect, stay for a few seconds, and disconnect repeatedly. Creates high player churn.             | High      | Stressing player data loading/unloading and join/leave event handlers.|
-| `chat_flood`      | Bots join and continuously send random chat messages.                                                   | High      | Testing chat plugins, anti-spam systems, and server thread performance. |
-| `motd_spam`       | Rapidly sends server list pings (MOTD requests). A network-level flood.                                 | Low       | Testing proxy performance (BungeeCord, Velocity) and network stack.     |
-| `modded_probe`    | A utility mode. A single actor connects to the server to get its mod list.                              | N/A       | Gathers information required for the `modded_replay` attack.          |
-| `modded_replay`   | Simulates modded clients joining by replaying the mod list gathered by the probe.                       | Medium    | Testing modded servers that require clients to have a matching mod set. |
+### Included Modules
+
+| ID              | Name                 | Category          | Description                                                              |
+| --------------- | -------------------- | ----------------- | ------------------------------------------------------------------------ |
+| `login_flood`   | Login Flood          | Denial of Service | Floods the server with fake player login attempts to exhaust resources.  |
+| `modded_flood`  | Modded Flood (FML)   | Modded            | A login flood optimized for Forge servers, using the FML handshake.      |
+
+The framework will automatically discover, register, and display the new module in the UI.
 
 ---
 
@@ -70,17 +69,17 @@ The easiest way to run the system is with Docker Compose.
     docker-compose up --build --scale actor=3 -d
     ```
 
-4.  **Open the Control Panel**: Navigate to `http://localhost:8000` in your web browser.
+4.  **Open Mission Control**: Navigate to `http://localhost:8000` in your web browser.
 
-5.  **Configure and Run a Test**:
+5.  **Configure and Run an Operation**:
     -   Enter your API key if you changed it.
-    -   If testing a server on your **local machine**, set the **Target Host** to `host.docker.internal`. This special DNS name allows the Docker containers to reach services running on your computer.
-    -   For a remote server, use its IP address or domain name.
-    -   The Server Status card will show live information if the server has `enable-query=true` in its `server.properties`.
-    -   Choose your desired attack mode, threads, and duration.
-    -   Click "Start".
+    -   Enter the **Target Host** and **Port**. If testing a server on your local machine, use `host.docker.internal` as the host.
+    -   Click the **Profile** button to fingerprint the target. This will show its status, version, and enumerate mods if it's a Forge server.
+    -   The **Exploit Module** dropdown will be populated with all available exploits. Select one.
+    -   Configure **Threads** and **Duration**.
+    -   Click **Start Task**.
 
-6.  **View Live Logs**: Logs from all actors will stream into the "Live Logs" panel in real-time. Actor IDs will appear as `project_actor_1`, `project_actor_2`, etc.
+6.  **View Live Logs**: Logs from the controller and all actors will stream into the "Live Operations Log" panel.
 
 7.  **Scale Actors**: You can change the number of running actors at any time.
     ```bash
@@ -99,22 +98,25 @@ The easiest way to run the system is with Docker Compose.
 
 The controller listens on port `8000`. All administrative endpoints under `/api/` require an API key to be sent in the `X-API-Key` header.
 
-#### `POST /api/query`
-Queries a server for its status using the UDP query protocol. Requires `host` and `port` in the JSON body.
+#### `GET /api/exploits`
+Lists all available, registered exploit modules.
+
+#### `POST /api/profile`
+Profiles a target server. Requires `host` and `port` in the JSON body. Returns detailed server information, including mod lists for Forge servers.
 
 #### `GET /api/status`
-Get the current status, configuration, and active actors.
+(Implicitly used by WebSocket) Get the current status, configuration, and active actors.
 
 #### `POST /api/start`
-Starts the stress test. You can optionally provide a new configuration in the request body.
+Starts an operation. Requires a configuration object in the body specifying the `host`, `port`, `threads`, `duration`, and `exploit` ID.
 
 #### `POST /api/stop`
-Stops the stress test.
+Stops the current operation.
 
 #### `PUT /api/config`
-Updates the task configuration without starting or stopping the test.
+Updates the task configuration for a running operation on-the-fly.
 
 ### WebSocket Endpoint
 
 #### `WS /ws/logs`
-Connect to this endpoint with any WebSocket client to receive a real-time stream of logs from all actors.
+Connect to this endpoint to receive a real-time JSON stream of system status updates and log messages from all components.
