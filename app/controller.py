@@ -1,4 +1,5 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends, HTTPException, status
+from fastapi.staticfiles import StaticFiles
 from fastapi.security import APIKeyHeader
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
