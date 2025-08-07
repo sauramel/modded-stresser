@@ -36,107 +36,167 @@
             </header>
 
             <div class="content-area">
-                <!-- Main Control Column -->
-                <div class="control-column">
-                    <div class="card">
-                        <div class="card-header">
-                            <h3><i class="fas fa-bullseye"></i> Attack Configuration</h3>
+                <!-- =================================================================
+                DASHBOARD VIEW
+                ================================================================== -->
+                <div class="view" id="dashboard-view">
+                    <div class="control-column">
+                        <div class="card">
+                            <div class="card-header">
+                                <h3><i class="fas fa-bullseye"></i> Attack Configuration</h3>
+                            </div>
+                            <form id="control-form">
+                                <div class="form-grid">
+                                    <div class="form-group">
+                                        <label for="host">Target Host</label>
+                                        <input type="text" id="host" required placeholder="e.g., host.docker.internal">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="port">Target Port</label>
+                                        <input type="number" id="port" value="25565" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="threads">Threads</label>
+                                        <input type="number" id="threads" value="200" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="duration">Duration (s)</label>
+                                        <input type="number" id="duration" value="60" required>
+                                    </div>
+                                    <div class="form-group" style="grid-column: 1 / -1;">
+                                        <label for="exploit">Attack Mode / Exploit</label>
+                                        <select id="exploit" required>
+                                            <option>Loading exploits...</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="button-group">
+                                    <button type="button" id="start-btn" class="btn btn-primary"><i class="fas fa-play"></i> Start Task</button>
+                                    <button type="button" id="stop-btn" class="btn btn-danger" disabled><i class="fas fa-stop"></i> Stop Task</button>
+                                    <button type="button" id="update-btn" class="btn btn-secondary"><i class="fas fa-sync-alt"></i> Update Live</button>
+                                </div>
+                            </form>
                         </div>
-                        <form id="control-form">
-                            <div class="form-grid">
-                                <div class="form-group">
-                                    <label for="host">Target Host</label>
-                                    <input type="text" id="host" required placeholder="e.g., host.docker.internal">
-                                </div>
-                                <div class="form-group">
-                                    <label for="port">Target Port</label>
-                                    <input type="number" id="port" value="25565" required>
-                                </div>
-                                <div class="form-group">
-                                    <label for="threads">Threads</label>
-                                    <input type="number" id="threads" value="200" required>
-                                </div>
-                                <div class="form-group">
-                                    <label for="duration">Duration (s)</label>
-                                    <input type="number" id="duration" value="60" required>
-                                </div>
-                                <div class="form-group" style="grid-column: 1 / -1;">
-                                    <label for="exploit">Attack Mode / Exploit</label>
-                                    <select id="exploit" required>
-                                        <option>Loading exploits...</option>
-                                    </select>
+
+                        <div class="card log-card">
+                            <div class="card-header">
+                                <h3><i class="fas fa-terminal"></i> Live Operations Log</h3>
+                                <div class="log-controls">
+                                    <label for="pause-scroll">
+                                        <input type="checkbox" id="pause-scroll">
+                                        <span>Pause</span>
+                                    </label>
+                                    <button id="clear-log-btn" class="btn btn-secondary" style="padding: 0.4rem 0.8rem; font-size: 0.8rem;">Clear</button>
                                 </div>
                             </div>
-                            <div class="button-group">
-                                <button type="button" id="start-btn" class="btn btn-primary"><i class="fas fa-play"></i> Start Task</button>
-                                <button type="button" id="stop-btn" class="btn btn-danger" disabled><i class="fas fa-stop"></i> Stop Task</button>
-                                <button type="button" id="update-btn" class="btn btn-secondary"><i class="fas fa-sync-alt"></i> Update Live</button>
+                            <div id="log-container" class="log-container">
+                                <pre id="log-box"></pre>
                             </div>
-                        </form>
+                        </div>
                     </div>
 
-                    <div class="card log-card">
-                        <div class="card-header">
-                            <h3><i class="fas fa-terminal"></i> Live Operations Log</h3>
-                            <div class="log-controls">
-                                <label for="pause-scroll">
-                                    <input type="checkbox" id="pause-scroll">
-                                    <span>Pause</span>
-                                </label>
-                                <button id="clear-log-btn" class="btn btn-secondary" style="padding: 0.4rem 0.8rem; font-size: 0.8rem;">Clear</button>
+                    <div class="info-column">
+                         <div class="card">
+                            <div class="card-header">
+                                <h3><i class="fas fa-cogs"></i> Current Task</h3>
                             </div>
+                            <ul id="task-details-list">
+                                <li><strong>Host</strong><span id="config-host">N/A</span></li>
+                                <li><strong>Port</strong><span id="config-port">N/A</span></li>
+                                <li><strong>Mode</strong><code id="config-mode">N/A</code></li>
+                                <li><strong>Threads</strong><span id="config-threads">N/A</span></li>
+                                <li><strong>Duration</strong><span id="config-duration">N/A</span>s</li>
+                            </ul>
                         </div>
-                        <div class="log-container">
-                            <pre id="log-box"></pre>
+                        <div class="card">
+                            <div class="card-header">
+                                <h3><i class="fas fa-info-circle"></i> Last Profiled Target</h3>
+                            </div>
+                            <ul id="server-status-list-summary">
+                                <li><strong>Status</strong><span id="profile-online-status-summary">N/A</span></li>
+                                <li><strong>Version</strong><span id="profile-version-summary">N/A</span></li>
+                                <li><strong>Players</strong><span id="profile-players-summary">N/A</span></li>
+                            </ul>
                         </div>
                     </div>
                 </div>
 
-                <!-- Right Info Column -->
-                <div class="info-column">
-                    <div class="card">
-                        <div class="card-header">
-                            <h3><i class="fas fa-server"></i> Server Profile</h3>
-                            <button id="profile-btn" class="btn btn-secondary" style="padding: 0.4rem 0.8rem; font-size: 0.8rem;">Profile</button>
+                <!-- =================================================================
+                PROFILER VIEW
+                ================================================================== -->
+                <div class="view hidden" id="profiler-view">
+                    <div class="control-column">
+                        <div class="card">
+                            <div class="card-header">
+                                <h3><i class="fas fa-search-location"></i> Profile a Server</h3>
+                            </div>
+                            <form id="profile-form">
+                                <div class="form-grid" style="grid-template-columns: 2fr 1fr;">
+                                    <div class="form-group">
+                                        <label for="profile-host">Target Host</label>
+                                        <input type="text" id="profile-host" required placeholder="e.g., mc.hypixel.net">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="profile-port">Target Port</label>
+                                        <input type="number" id="profile-port" value="25565" required>
+                                    </div>
+                                </div>
+                                <div class="button-group">
+                                    <button type="button" id="profile-btn" class="btn btn-primary"><i class="fas fa-crosshairs"></i> Profile</button>
+                                </div>
+                            </form>
                         </div>
-                        <div id="server-status">
-                            <p id="profile-status-text">Enter host/port and click Profile.</p>
-                            <ul id="server-status-list" class="hidden">
-                                <li><strong>Status</strong><span id="profile-online-status"></span></li>
-                                <li><strong>Version</strong><span id="profile-version"></span></li>
-                                <li><strong>Type</strong><span id="profile-type"></span></li>
-                                <li><strong>Players</strong><span id="profile-players"></span></li>
-                                <li style="flex-direction: column; align-items: flex-start;">
-                                    <strong>MOTD</strong>
-                                    <pre id="profile-motd"></pre>
-                                </li>
-                            </ul>
-                            <div id="mod-list-container" class="hidden" style="margin-top: 1rem;">
-                                <h4><i class="fas fa-box-open"></i> Mods (<span id="mod-count">0</span>)</h4>
-                                <ul id="mod-list" class="compact-list">
-                                    <!-- Mod list will be populated here -->
+                    </div>
+                    <div class="info-column">
+                        <div class="card">
+                            <div class="card-header">
+                                <h3><i class="fas fa-server"></i> Server Profile Result</h3>
+                            </div>
+                            <div id="server-status">
+                                <p id="profile-status-text">Enter host/port and click Profile.</p>
+                                <ul id="server-status-list" class="hidden">
+                                    <li><strong>Status</strong><span id="profile-online-status"></span></li>
+                                    <li><strong>Version</strong><span id="profile-version"></span></li>
+                                    <li><strong>Type</strong><span id="profile-type"></span></li>
+                                    <li><strong>Players</strong><span id="profile-players"></span></li>
+                                    <li style="flex-direction: column; align-items: flex-start;">
+                                        <strong>MOTD</strong>
+                                        <pre id="profile-motd"></pre>
+                                    </li>
                                 </ul>
+                                <div id="mod-list-container" class="hidden" style="margin-top: 1rem;">
+                                    <h4><i class="fas fa-box-open"></i> Mods (<span id="mod-count">0</span>)</h4>
+                                    <ul id="mod-list" class="compact-list"></ul>
+                                </div>
                             </div>
                         </div>
                     </div>
-                    <div class="card">
+                </div>
+
+                <!-- =================================================================
+                EXPLOITS VIEW
+                ================================================================== -->
+                <div class="view hidden" id="exploits-view">
+                    <div class="card" style="flex: 1;">
+                        <div class="card-header">
+                            <h3><i class="fas fa-bomb"></i> Available Exploits</h3>
+                        </div>
+                        <div id="exploit-library-list" class="exploit-library">
+                            <p>Loading exploit library...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- =================================================================
+                ACTORS VIEW
+                ================================================================== -->
+                <div class="view hidden" id="actors-view">
+                    <div class="card" style="flex: 1;">
                         <div class="card-header">
                             <h3><i class="fas fa-users"></i> Active Actors (<span id="actor-count">0</span>)</h3>
                         </div>
-                        <ul id="actor-list">
+                        <ul id="actor-list" class="actor-list-detailed">
                             <li>No actors have checked in.</li>
-                        </ul>
-                    </div>
-                    <div class="card">
-                        <div class="card-header">
-                            <h3><i class="fas fa-cogs"></i> Current Task</h3>
-                        </div>
-                        <ul id="task-details-list">
-                            <li><strong>Host</strong><span id="config-host">N/A</span></li>
-                            <li><strong>Port</strong><span id="config-port">N/A</span></li>
-                            <li><strong>Mode</strong><code id="config-mode">N/A</code></li>
-                            <li><strong>Threads</strong><span id="config-threads">N/A</span></li>
-                            <li><strong>Duration</strong><span id="config-duration">N/A</span>s</li>
                         </ul>
                     </div>
                 </div>

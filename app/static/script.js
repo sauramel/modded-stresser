@@ -14,15 +14,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const pauseScrollCheckbox = document.getElementById('pause-scroll');
     const clearLogBtn = document.getElementById('clear-log-btn');
     
-    // Form
+    // Main Attack Form
     const form = document.getElementById('control-form');
     const startBtn = document.getElementById('start-btn');
     const stopBtn = document.getElementById('stop-btn');
     const updateBtn = document.getElementById('update-btn');
     const exploitSelect = document.getElementById('exploit');
     
-    // Profiler
+    // Profiler View
     const profileBtn = document.getElementById('profile-btn');
+    const profileHostInput = document.getElementById('profile-host');
+    const profilePortInput = document.getElementById('profile-port');
     const profileStatusText = document.getElementById('profile-status-text');
     const serverStatusList = document.getElementById('server-status-list');
     const profileOnlineStatus = document.getElementById('profile-online-status');
@@ -33,6 +35,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const modListContainer = document.getElementById('mod-list-container');
     const modCount = document.getElementById('mod-count');
     const modList = document.getElementById('mod-list');
+
+    // Dashboard summary
+    const profileOnlineStatusSummary = document.getElementById('profile-online-status-summary');
+    const profileVersionSummary = document.getElementById('profile-version-summary');
+    const profilePlayersSummary = document.getElementById('profile-players-summary');
+
+    // Exploit Library
+    const exploitLibraryList = document.getElementById('exploit-library-list');
+
+    // Navigation
+    const navItems = document.querySelectorAll('.nav-item');
+    const views = document.querySelectorAll('.view');
+    const viewTitle = document.getElementById('view-title');
 
     const API_BASE = window.location.origin;
 
@@ -58,8 +73,8 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const profileServer = async () => {
-        const host = document.getElementById('host').value;
-        const port = parseInt(document.getElementById('port').value, 10);
+        const host = profileHostInput.value;
+        const port = parseInt(profilePortInput.value, 10);
         if (!host || !port) {
             profileStatusText.textContent = 'Enter a host and port to profile.';
             serverStatusList.classList.add('hidden');
@@ -95,6 +110,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- UI Update Functions ---
     const updateStatusUI = (data) => {
+        // Main status
         if (data.running) {
             statusIndicatorDot.className = 'indicator-dot running';
             statusText.textContent = 'Task Running';
@@ -106,7 +122,14 @@ document.addEventListener('DOMContentLoaded', () => {
             startBtn.disabled = false;
             stopBtn.disabled = true;
         }
+        
+        // Task config form and details
         const config = data.task_config || {};
+        document.getElementById('config-host').textContent = config.host || 'N/A';
+        document.getElementById('config-port').textContent = config.port || 'N/A';
+        document.getElementById('config-mode').textContent = config.exploit || 'N/A';
+        document.getElementById('config-threads').textContent = config.threads || 'N/A';
+        document.getElementById('config-duration').textContent = config.duration || 'N/A';
         
         // Pre-fill form if empty
         if (!form.host.value && config.host) form.host.value = config.host;
@@ -127,8 +150,10 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         actorIds.sort().forEach(id => {
+            const actor = actors[id];
             const li = document.createElement('li');
-            li.textContent = `${id.substring(0, 12)}`; // Shorten ID
+            const lastSeen = new Date(actor.last_seen).toLocaleString();
+            li.innerHTML = `<strong>${id.substring(0, 12)}...</strong><span>Last seen: ${lastSeen}</span>`;
             actorList.appendChild(li);
         });
     };
@@ -138,12 +163,19 @@ document.addEventListener('DOMContentLoaded', () => {
         serverStatusList.classList.remove('hidden');
 
         if (isOnline) {
+            // Main profiler view
             profileOnlineStatus.textContent = 'Online';
             profileOnlineStatus.style.color = 'var(--accent-success)';
             profileMotd.innerHTML = data.motd.replace(/§./g, ''); // Basic color code stripping
             profilePlayers.textContent = `${data.players.online} / ${data.players.max}`;
             profileVersion.textContent = data.version.name;
             profileType.textContent = data.type;
+
+            // Dashboard summary
+            profileOnlineStatusSummary.textContent = 'Online';
+            profileOnlineStatusSummary.style.color = 'var(--accent-success)';
+            profileVersionSummary.textContent = data.version.name;
+            profilePlayersSummary.textContent = `${data.players.online} / ${data.players.max}`;
 
             if (data.mods && data.mods.length > 0) {
                 modListContainer.classList.remove('hidden');
@@ -154,6 +186,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
         } else {
+            // Main profiler view
             profileOnlineStatus.textContent = 'Offline';
             profileOnlineStatus.style.color = 'var(--accent-danger)';
             profileMotd.textContent = data.error || 'Failed to connect.';
@@ -161,10 +194,17 @@ document.addEventListener('DOMContentLoaded', () => {
             profileVersion.textContent = 'N/A';
             profileType.textContent = 'N/A';
             modListContainer.classList.add('hidden');
+
+            // Dashboard summary
+            profileOnlineStatusSummary.textContent = 'Offline';
+            profileOnlineStatusSummary.style.color = 'var(--accent-danger)';
+            profileVersionSummary.textContent = 'N/A';
+            profilePlayersSummary.textContent = 'N/A';
         }
     };
 
     const logToScreen = (logData) => {
+        if (!logContainer) return; // Guard against errors if element not found
         const timestamp = new Date(logData.timestamp || Date.now()).toLocaleTimeString();
         const line = document.createElement('span');
         line.classList.add('log-line');
@@ -197,16 +237,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const populateExploits = async () => {
         try {
             const exploits = await fetchAPI('/api/exploits', { headers: getHeaders() });
-            exploitSelect.innerHTML = ''; // Clear "Loading..."
             
+            // Populate attack form dropdown
+            exploitSelect.innerHTML = '';
             const categories = {};
             exploits.forEach(exploit => {
-                if (!categories[exploit.category]) {
-                    categories[exploit.category] = [];
-                }
+                if (!categories[exploit.category]) categories[exploit.category] = [];
                 categories[exploit.category].push(exploit);
             });
-
             for (const category in categories) {
                 const optgroup = document.createElement('optgroup');
                 optgroup.label = category;
@@ -220,9 +258,47 @@ document.addEventListener('DOMContentLoaded', () => {
                 exploitSelect.appendChild(optgroup);
             }
 
+            // Populate exploit library view
+            exploitLibraryList.innerHTML = '';
+             for (const category in categories) {
+                const categoryDiv = document.createElement('div');
+                categoryDiv.className = 'exploit-category';
+                const categoryTitle = document.createElement('h3');
+                categoryTitle.textContent = category;
+                categoryDiv.appendChild(categoryTitle);
+                
+                const list = document.createElement('ul');
+                categories[category].forEach(exploit => {
+                    const item = document.createElement('li');
+                    item.innerHTML = `<strong>${exploit.name}</strong><p>${exploit.description}</p>`;
+                    list.appendChild(item);
+                });
+                categoryDiv.appendChild(list);
+                exploitLibraryList.appendChild(categoryDiv);
+            }
+
         } catch (error) {
             exploitSelect.innerHTML = '<option value="">Error loading exploits</option>';
+            exploitLibraryList.innerHTML = '<p>Could not load exploit library. Check API key and controller status.</p>';
         }
+    };
+
+    // --- SPA Navigation ---
+    const switchView = (viewName) => {
+        views.forEach(view => view.classList.add('hidden'));
+        const targetView = document.getElementById(`${viewName}-view`);
+        if (targetView) {
+            targetView.classList.remove('hidden');
+        }
+
+        navItems.forEach(item => {
+            if (item.dataset.view === viewName) {
+                item.classList.add('active');
+                viewTitle.textContent = item.querySelector('span').textContent;
+            } else {
+                item.classList.remove('active');
+            }
+        });
     };
 
     // --- WebSocket ---
@@ -312,15 +388,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
     profileBtn.addEventListener('click', profileServer);
 
+    navItems.forEach(item => {
+        item.addEventListener('click', () => switchView(item.dataset.view));
+    });
+
     // --- Initialization ---
     const init = () => {
         logToScreen({ level: 'SYSTEM', message: 'Voidout UI initialized.' });
         setupWebSocket();
         populateExploits();
-        // Initial profile on load if host is set
-        if (document.getElementById('host').value) {
-            setTimeout(profileServer, 500);
-        }
+        switchView('dashboard'); // Set initial view
+        
+        // Auto-fill profiler from dashboard form if empty
+        profileHostInput.value = document.getElementById('host').value;
+        profilePortInput.value = document.getElementById('port').value;
     };
 
     init();
