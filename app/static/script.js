@@ -4,13 +4,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const statusIndicatorDot = document.getElementById('status-indicator-dot');
     const statusText = document.getElementById('status-text');
     
-    // Config display
-    const configHost = document.getElementById('config-host');
-    const configPort = document.getElementById('config-port');
-    const configThreads = document.getElementById('config-threads');
-    const configDuration = document.getElementById('config-duration');
-    const configMode = document.getElementById('config-mode');
-    
     // Actor display
     const actorCount = document.getElementById('actor-count');
     const actorList = document.getElementById('actor-list');
@@ -26,16 +19,20 @@ document.addEventListener('DOMContentLoaded', () => {
     const startBtn = document.getElementById('start-btn');
     const stopBtn = document.getElementById('stop-btn');
     const updateBtn = document.getElementById('update-btn');
+    const exploitSelect = document.getElementById('exploit');
     
-    // Query
-    const queryBtn = document.getElementById('query-btn');
-    const queryStatusText = document.getElementById('query-status-text');
+    // Profiler
+    const profileBtn = document.getElementById('profile-btn');
+    const profileStatusText = document.getElementById('profile-status-text');
     const serverStatusList = document.getElementById('server-status-list');
-    const queryOnlineStatus = document.getElementById('query-online-status');
-    const queryMotd = document.getElementById('query-motd');
-    const queryPlayers = document.getElementById('query-players');
-    const queryVersion = document.getElementById('query-version');
-    const queryPlugins = document.getElementById('query-plugins');
+    const profileOnlineStatus = document.getElementById('profile-online-status');
+    const profileMotd = document.getElementById('profile-motd');
+    const profilePlayers = document.getElementById('profile-players');
+    const profileVersion = document.getElementById('profile-version');
+    const profileType = document.getElementById('profile-type');
+    const modListContainer = document.getElementById('mod-list-container');
+    const modCount = document.getElementById('mod-count');
+    const modList = document.getElementById('mod-list');
 
     const API_BASE = window.location.origin;
 
@@ -60,28 +57,31 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    const queryServer = async () => {
+    const profileServer = async () => {
         const host = document.getElementById('host').value;
         const port = parseInt(document.getElementById('port').value, 10);
         if (!host || !port) {
-            queryStatusText.textContent = 'Enter a host and port to query.';
+            profileStatusText.textContent = 'Enter a host and port to profile.';
             serverStatusList.classList.add('hidden');
             return;
         }
 
-        queryStatusText.textContent = 'Pinging server...';
-        queryStatusText.classList.remove('hidden');
+        profileStatusText.textContent = 'Profiling server...';
+        profileStatusText.classList.remove('hidden');
         serverStatusList.classList.add('hidden');
+        profileBtn.disabled = true;
 
         try {
-            const data = await fetchAPI('/api/query', {
+            const data = await fetchAPI('/api/profile', {
                 method: 'POST',
                 headers: getHeaders(),
                 body: JSON.stringify({ host, port }),
             });
-            updateQueryUI(data, true);
+            updateProfileUI(data, true);
         } catch (error) {
-            updateQueryUI({ error: error.message }, false);
+            updateProfileUI({ error: error.message }, false);
+        } finally {
+            profileBtn.disabled = false;
         }
     };
 
@@ -90,7 +90,7 @@ document.addEventListener('DOMContentLoaded', () => {
         port: parseInt(document.getElementById('port').value, 10),
         threads: parseInt(document.getElementById('threads').value, 10),
         duration: parseInt(document.getElementById('duration').value, 10),
-        mode: document.getElementById('mode').value,
+        exploit: exploitSelect.value,
     });
 
     // --- UI Update Functions ---
@@ -107,18 +107,15 @@ document.addEventListener('DOMContentLoaded', () => {
             stopBtn.disabled = true;
         }
         const config = data.task_config || {};
-        configHost.textContent = config.host || 'N/A';
-        configPort.textContent = config.port || 'N/A';
-        configThreads.textContent = config.threads || 'N/A';
-        configDuration.textContent = config.duration || 'N/A';
-        configMode.textContent = config.mode || 'N/A';
-
+        
         // Pre-fill form if empty
         if (!form.host.value && config.host) form.host.value = config.host;
         if (form.port.value === "25565" && config.port) form.port.value = config.port;
         if (form.threads.value === "200" && config.threads) form.threads.value = config.threads;
         if (form.duration.value === "60" && config.duration) form.duration.value = config.duration;
-        if (config.mode) form.mode.value = config.mode;
+        if (config.exploit && exploitSelect.querySelector(`option[value="${config.exploit}"]`)) {
+            exploitSelect.value = config.exploit;
+        }
     };
 
     const updateActorsUI = (actors) => {
@@ -136,24 +133,34 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     };
 
-    const updateQueryUI = (data, isOnline) => {
-        queryStatusText.classList.add('hidden');
+    const updateProfileUI = (data, isOnline) => {
+        profileStatusText.classList.add('hidden');
         serverStatusList.classList.remove('hidden');
 
         if (isOnline) {
-            queryOnlineStatus.textContent = 'Online';
-            queryOnlineStatus.style.color = 'var(--accent-success)';
-            queryMotd.innerHTML = data.motd.replace(/§./g, ''); // Basic color code stripping
-            queryPlayers.textContent = `${data.num_players} / ${data.max_players}`;
-            queryVersion.textContent = data.version;
-            queryPlugins.textContent = data.plugins.length > 50 ? 'Too many to display' : (data.plugins || 'N/A');
+            profileOnlineStatus.textContent = 'Online';
+            profileOnlineStatus.style.color = 'var(--accent-success)';
+            profileMotd.innerHTML = data.motd.replace(/§./g, ''); // Basic color code stripping
+            profilePlayers.textContent = `${data.players.online} / ${data.players.max}`;
+            profileVersion.textContent = data.version.name;
+            profileType.textContent = data.type;
+
+            if (data.mods && data.mods.length > 0) {
+                modListContainer.classList.remove('hidden');
+                modCount.textContent = data.mods.length;
+                modList.innerHTML = data.mods.map(mod => `<li>${mod.modid} (${mod.version})</li>`).join('');
+            } else {
+                modListContainer.classList.add('hidden');
+            }
+
         } else {
-            queryOnlineStatus.textContent = 'Offline';
-            queryOnlineStatus.style.color = 'var(--accent-danger)';
-            queryMotd.textContent = data.error || 'Failed to connect.';
-            queryPlayers.textContent = 'N/A';
-            queryVersion.textContent = 'N/A';
-            queryPlugins.textContent = 'N/A';
+            profileOnlineStatus.textContent = 'Offline';
+            profileOnlineStatus.style.color = 'var(--accent-danger)';
+            profileMotd.textContent = data.error || 'Failed to connect.';
+            profilePlayers.textContent = 'N/A';
+            profileVersion.textContent = 'N/A';
+            profileType.textContent = 'N/A';
+            modListContainer.classList.add('hidden');
         }
     };
 
@@ -184,6 +191,37 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (!pauseScrollCheckbox.checked) {
             logContainer.scrollTop = logContainer.scrollHeight;
+        }
+    };
+
+    const populateExploits = async () => {
+        try {
+            const exploits = await fetchAPI('/api/exploits', { headers: getHeaders() });
+            exploitSelect.innerHTML = ''; // Clear "Loading..."
+            
+            const categories = {};
+            exploits.forEach(exploit => {
+                if (!categories[exploit.category]) {
+                    categories[exploit.category] = [];
+                }
+                categories[exploit.category].push(exploit);
+            });
+
+            for (const category in categories) {
+                const optgroup = document.createElement('optgroup');
+                optgroup.label = category;
+                categories[category].forEach(exploit => {
+                    const option = document.createElement('option');
+                    option.value = exploit.id;
+                    option.textContent = exploit.name;
+                    option.disabled = exploit.disabled;
+                    optgroup.appendChild(option);
+                });
+                exploitSelect.appendChild(optgroup);
+            }
+
+        } catch (error) {
+            exploitSelect.innerHTML = '<option value="">Error loading exploits</option>';
         }
     };
 
@@ -263,7 +301,8 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     
     apiKeyInput.addEventListener('change', () => {
-        logToScreen({ level: 'SYSTEM', message: 'API Key updated.' });
+        logToScreen({ level: 'SYSTEM', message: 'API Key updated. Reloading exploits...' });
+        populateExploits();
     });
 
     clearLogBtn.addEventListener('click', () => {
@@ -271,15 +310,16 @@ document.addEventListener('DOMContentLoaded', () => {
         logToScreen({ level: 'SYSTEM', message: 'Log view cleared.' });
     });
 
-    queryBtn.addEventListener('click', queryServer);
+    profileBtn.addEventListener('click', profileServer);
 
     // --- Initialization ---
     const init = () => {
         logToScreen({ level: 'SYSTEM', message: 'Mission Control UI initialized.' });
         setupWebSocket();
-        // Initial query on load if host is set
+        populateExploits();
+        // Initial profile on load if host is set
         if (document.getElementById('host').value) {
-            setTimeout(queryServer, 500);
+            setTimeout(profileServer, 500);
         }
     };
 
