@@ -1,4 +1,4 @@
-# Modular Exploit Framework
+# Voidout - Modular Exploit Framework
 
 A professional-grade, distributed, and containerized framework for testing Minecraft server network resilience. This tool has been architected for extensibility, allowing for the rapid development and deployment of new exploit modules.
 
@@ -19,11 +19,11 @@ The use of this software to attack, disrupt, or gain unauthorized access to any 
 ## Core Features
 
 - **Modular Exploit Engine**: Gone are the days of hardcoded attacks. The framework now features a dynamic exploit loader. Each exploit is a self-contained Python class in the `app/exploits/` directory, allowing for easy creation of new, complex modules.
-- **Advanced Target Profiler**: Before engaging a target, the framework can run a detailed profile to fingerprint the server. It identifies the server type (Vanilla, Forge, etc.), version, and can enumerate the complete mod list on Forge servers.
+- **Advanced Target Profiler**: Before engaging a target, the framework can run a detailed profile to fingerprint the server. It identifies the server type (Vanilla, Forge, etc.), and can enumerate the complete mod list on Forge servers.
 - **Distributed Architecture**: Scale your operations by deploying multiple `actor` nodes. The system is designed for horizontal scaling via Docker Compose.
 - **Web UI Mission Control**: A modern, responsive web interface to profile targets, select and configure exploit modules, and monitor operations in real-time.
 - **Live Log Streaming**: A WebSocket endpoint provides a live, color-coded feed of logs from the controller and all connected actors.
-- **Dynamic UI**: The UI is not static. It dynamically fetches the list of available exploits from the controller's API, ensuring the frontend always reflects the backend's capabilities.
+- **Dynamic UI**: The UI is not static. It dynamically fetches the list of available exploits and their required arguments from the controller's API, ensuring the frontend always reflects the backend's capabilities.
 
 ---
 
@@ -31,14 +31,68 @@ The use of this software to attack, disrupt, or gain unauthorized access to any 
 
 The power of this framework lies in its modularity. To create a new exploit, simply add a new Python file to the `app/exploits/` directory containing a class that inherits from `exploits.base.Exploit`.
 
-### Included Modules
+### How it Works
+1.  **Create a File**: Add a new `.py` file in `app/exploits/` (e.g., `app/exploits/my_new_exploit.py`).
+2.  **Inherit from Base**: Your class must inherit from `exploits.base.Exploit`.
+3.  **Define Metadata**: Set the class attributes `id`, `name`, `description`, and `category`.
+4.  **Define Arguments**: If your exploit needs custom parameters from the UI, define them in the `args` list. These will be rendered automatically on the frontend.
+5.  **Implement `run`**: The core logic of your exploit goes into the `run` method. This method is what each thread will execute in a loop.
 
-| ID              | Name                 | Category          | Description                                                              |
-| --------------- | -------------------- | ----------------- | ------------------------------------------------------------------------ |
-| `login_flood`   | Login Flood          | Denial of Service | Floods the server with fake player login attempts to exhaust resources.  |
-| `modded_flood`  | Modded Flood (FML)   | Modded            | A login flood optimized for Forge servers, using the FML handshake.      |
+### Example: Creating a Chat Spammer
 
+```python
+# in app/exploits/chat_spam.py
+import time
+from .base import Exploit
+
+class ChatSpamExploit(Exploit):
+    # --- Metadata ---
+    id = "chat_spam"
+    name = "Chat Spam"
+    description = "Floods the server chat with a configurable message."
+    category = "Legitimate Stress Test"
+    
+    # --- Arguments for the UI ---
+    args = [
+        {
+            "name": "username",
+            "type": "string",
+            "label": "Bot Username",
+            "default": "SpamBot"
+        },
+        {
+            "name": "message",
+            "type": "string",
+            "label": "Spam Message",
+            "default": "This is a test message!"
+        }
+    ]
+
+    def run(self, log_callback):
+        # Access arguments passed from the UI
+        username = self.exploit_args.get("username")
+        message = self.exploit_args.get("message")
+
+        # In a real implementation, you would connect and send the chat packet.
+        # Here, we just log it.
+        log_callback({
+            "level": "INFO",
+            "message": f"Simulating '{username}' sending chat message: '{message}'"
+        })
+        time.sleep(1) # Simulate action
+```
 The framework will automatically discover, register, and display the new module in the UI.
+
+---
+
+## Included Modules
+
+| ID                  | Name                 | Category                   | Description                                                                                             |
+| ------------------- | -------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `login_flood`       | Login Flood          | Legitimate Stress Test     | Floods the server with login attempts using random usernames.                                           |
+| `join_spam`         | Join/Leave Spam      | Legitimate Stress Test     | Repeatedly joins and leaves the server to stress player handling plugins.                               |
+| `handshake_crash`   | Handshake Crash      | Denial of Service          | Sends a malformed handshake packet that can crash older or unpatched servers.                           |
+| `forge_mod_exploit` | Forge Mod Exploit    | Denial of Service          | Example exploit that requires the server to be running Forge. Checks for a specific mod before running. |
 
 ---
 
@@ -78,51 +132,32 @@ The easiest way to run the system is with Docker Compose.
 
 ## Manual Container Execution (with `docker run`)
 
-For more granular control or integration with custom scripts, you can run the controller and actor containers manually.
-
-### Prerequisites
-- Docker
+For more granular control, you can run the controller and actor containers manually.
 
 ### 1. Build the Docker Image
-
-First, build the universal Docker image from the project's root directory. We'll tag it as `exploit-framework` for easy reference.
-
 ```bash
 docker build -t exploit-framework -f app/Dockerfile .
 ```
 
 ### 2. Create a Docker Network
-
-For the containers to communicate, they must share a network. Let's create one called `exploit-net`.
-
 ```bash
 docker network create exploit-net
 ```
 
 ### 3. Run the Controller Container
-
-Launch the controller container on the `exploit-net` network. We give it the name `controller` so actors can find it easily.
-
 ```bash
 docker run -d \
   --name controller \
   --network exploit-net \
   -p 8000:8000 \
+  -v ./logs:/app/logs \
   -e MODE=controller \
   -e API_KEY="your-secret-api-key-here" \
   exploit-framework
 ```
-- `-d`: Run in detached mode.
-- `--name controller`: Critical for service discovery by actors.
-- `--network exploit-net`: Attaches the container to our shared network.
-- `-p 8000:8000`: Exposes the web UI and API on your host machine.
-- `-e MODE=controller`: Tells the container to start in controller mode.
-- `-e API_KEY`: Sets your secret API key.
 
 ### 4. Run Actor Containers
-
-Now, launch as many actor containers as you need. They will connect to the controller using its container name (`controller`) as the hostname.
-
+Launch as many actor containers as you need. The `ACTOR_ID` is automatically generated from the container's unique hostname.
 ```bash
 # Launch the first actor
 docker run -d \
@@ -138,83 +173,40 @@ docker run -d \
   -e CONTROLLER_HOST="http://controller:8000" \
   exploit-framework
 ```
-- The `ACTOR_ID` is automatically generated from the container's unique hostname, so you don't need to set it manually.
-- You can run the command multiple times to scale up the number of actors.
-
-### 5. Stopping and Cleanup
-
-```bash
-# Stop and remove the containers
-docker stop controller && docker rm controller
-# You will need to find and stop each actor container individually or by a script
-docker ps -a | grep exploit-framework | awk '{print $1}' | xargs docker stop | xargs docker rm
-
-# Remove the network
-docker network rm exploit-net
-```
 
 ---
 
 ## Manual Execution (Without Docker)
 
-For development or if you prefer not to use Docker, you can run the controller and actors directly on your machine.
-
-### Prerequisites
-- Python 3.7+
-- `pip` and `venv`
-
 ### 1. Setup
-
-First, set up a Python virtual environment and install the required dependencies.
-
 ```bash
-# Create a virtual environment
+# Create and activate a virtual environment
 python3 -m venv venv
-
-# Activate it
-# On macOS and Linux:
 source venv/bin/activate
-# On Windows:
-# venv\Scripts\activate
 
-# Install dependencies from the app directory
+# Install dependencies
 pip install -r app/requirements.txt
 ```
 
 ### 2. Run the Controller
-
-Open a terminal, activate the virtual environment, and run the following command to start the controller:
-
 ```bash
-# Set the mode and run the main script
 MODE=controller python app/main.py
 ```
-The controller will start on `http://localhost:8000` by default. You can customize the host, port, and API key with environment variables:
-`API_KEY=my-secret-key LISTEN_PORT=8080 MODE=controller python app/main.py`
 
 ### 3. Run Actors
-
-Open one or more new terminals to run the actor processes. **It is critical that each actor has a unique `ACTOR_ID`**.
+Open one or more new terminals. **It is critical that each actor has a unique `ACTOR_ID` when running manually on the same machine.**
 
 **Terminal 1 - Actor 1:**
 ```bash
-# Activate the virtual environment first
 source venv/bin/activate
-
-# Run the first actor
 MODE=actor ACTOR_ID=manual-actor-01 python app/main.py
 ```
 
 **Terminal 2 - Actor 2:**
 ```bash
-# Activate the virtual environment first
 source venv/bin/activate
-
-# Run the second actor with a different ID
 MODE=actor ACTOR_ID=manual-actor-02 python app/main.py
 ```
-
-The actors will automatically connect to the controller at `http://localhost:8000`. You can point them to a different controller using the `CONTROLLER_HOST` environment variable.
 
 ---
 
@@ -223,24 +215,26 @@ The actors will automatically connect to the controller at `http://localhost:800
 The controller listens on port `8000`. All administrative endpoints under `/api/` require an API key to be sent in the `X-API-Key` header.
 
 #### `GET /api/exploits`
-Lists all available, registered exploit modules.
+Lists all available, registered exploit modules and their configurable arguments.
 
 #### `POST /api/profile`
-Profiles a target server. Requires `host` and `port` in the JSON body. Returns detailed server information, including mod lists for Forge servers.
-
-#### `GET /api/status`
-(Implicitly used by WebSocket) Get the current status, configuration, and active actors.
+Profiles a target server. Returns detailed server information, including mod lists for Forge servers.
+- **Body**: `{ "host": "...", "port": ... }`
 
 #### `POST /api/start`
-Starts an operation. Requires a configuration object in the body specifying the `host`, `port`, `threads`, `duration`, and `exploit` ID.
+Starts an operation.
+- **Body**: `{ "host": "...", "port": ..., "threads": ..., "duration": ..., "exploit": "exploit_id", "exploit_args": { "arg1": "value1", ... } }`
+- **Note**: If the chosen exploit `requires_forge`, you must profile the target first. The controller will use the cached profile data.
 
 #### `POST /api/stop`
 Stops the current operation.
 
 #### `PUT /api/config`
-Updates the task configuration for a running operation on-the-fly.
+Updates the task configuration that will be used when the *next* task is started. Cannot be used while a task is running.
+- **Body**: Same as `/api/start`.
 
 ### WebSocket Endpoint
 
 #### `WS /ws/logs`
-Connect to this endpoint to receive a real-time JSON stream of system status updates and log messages from all components.
+Connect to this endpoint to receive a real-time JSON stream of system status updates and log messages.
+- **Message Format**: `{ "type": "log" | "status_update", "payload": { ... } }`
