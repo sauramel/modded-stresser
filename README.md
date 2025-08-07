@@ -6,7 +6,7 @@ It operates on a controller/actor model. The `controller` provides a REST API an
 
 ---
 
-##  юридическое уведомление (Legal Disclaimer)
+## Legal Disclaimer
 
 **THIS SOFTWARE IS INTENDED FOR EDUCATIONAL AND AUTHORIZED TESTING PURPOSES ONLY.**
 
