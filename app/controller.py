@@ -11,7 +11,7 @@ import asyncio
 
 from .config import TARGET_HOST, TARGET_PORT, THREADS, DURATION, API_KEY
 from . import profiler
-from .stress import get_all_exploits, get_exploit_by_id
+from .exploits import get_all_exploits, get_exploit_by_id
 
 # --- Pydantic Models ---
 class TaskConfig(BaseModel):
