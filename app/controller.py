@@ -27,6 +27,12 @@ class ProfileRequest(BaseModel):
     port: int
     timeout: Optional[int] = 5
 
+class LogEntry(BaseModel):
+    actor_id: str
+    level: str
+    message: str
+    timestamp: str
+
 # --- In-memory State ---
 state: Dict[str, Any] = {
     "running": False,
@@ -55,9 +61,11 @@ class ConnectionManager:
         self.active_connections.remove(websocket)
 
     async def broadcast_json(self, data: dict):
+        if not self.active_connections:
+            return
         message = json.dumps(data, default=str)
-        for connection in self.active_connections:
-            await connection.send_text(message)
+        # Use asyncio.gather to send messages concurrently
+        await asyncio.gather(*[conn.send_text(message) for conn in self.active_connections])
 
 manager = ConnectionManager()
 
@@ -95,6 +103,7 @@ async def get_task(actor_id: str = "unknown"):
     now = datetime.utcnow()
     if actor_id not in state["actors"]:
         state["actors"][actor_id] = {"last_seen": now.isoformat()}
+        # To avoid overwhelming clients, we only broadcast on new actor join, not every check-in.
         await broadcast_status_update()
     else:
         state["actors"][actor_id]["last_seen"] = now.isoformat()
@@ -105,19 +114,23 @@ async def get_task(actor_id: str = "unknown"):
         return {"exploit": "idle"}
 
 @app.post("/log")
-async def post_log(data: dict):
-    log_line_data = data.copy()
-    log_line_data['timestamp'] = datetime.utcnow().isoformat()
-    
-    actor_id = data.get("actor_id", "unknown")
+async def post_log(log_entries: List[LogEntry]):
+    """Receives a batch of log entries from an actor."""
     log_dir = Path("logs")
     log_dir.mkdir(exist_ok=True)
-    log_path = log_dir / f"{actor_id}.log"
-    with open(log_path, "a") as f:
-        f.write(json.dumps(log_line_data) + "\n")
     
-    await broadcast_log(log_line_data)
-    return {"status": "ok"}
+    # Process logs asynchronously to avoid blocking the endpoint
+    async def process_and_broadcast():
+        for entry in log_entries:
+            log_line_data = entry.dict()
+            actor_id = log_line_data.get("actor_id", "unknown")
+            log_path = log_dir / f"{actor_id}.log"
+            with open(log_path, "a") as f:
+                f.write(json.dumps(log_line_data) + "\n")
+            await broadcast_log(log_line_data)
+
+    asyncio.create_task(process_and_broadcast())
+    return {"status": "ok", "received": len(log_entries)}
 
 # --- Admin API endpoints ---
 
@@ -132,6 +145,7 @@ def list_exploits():
             "description": ex.description,
             "category": ex.category,
             "requires_forge": ex.requires_forge,
+            "disabled": getattr(ex, 'disabled', False),
             "args": ex.args,
         }
         for ex in exploits
@@ -167,12 +181,6 @@ async def start_task(config: TaskConfig):
         raise HTTPException(status_code=404, detail=f"Exploit '{config.exploit}' not found.")
 
     state["task_config"] = config.dict()
-    
-    # NOTE: The check for Forge mod data has been removed as mcquery does not provide it.
-    # This resolves the 400 error but means Forge-specific exploits may fail if they
-    # rely on data that is no longer passed from the controller. The actor-side
-    # exploit logic may need to be adjusted in the future.
-
     state["running"] = True
     await broadcast_status_update()
     await broadcast_log({"level": "SYSTEM", "message": f"Task '{exploit_module.name}' started against {config.host}:{config.port}."})
@@ -206,19 +214,23 @@ async def websocket_endpoint(websocket: WebSocket):
     await websocket.send_text(json.dumps({"type": "status_update", "payload": state}, default=str))
     try:
         while True:
-            # Keep connection alive
+            # Keep connection alive by waiting for a message (or disconnect)
             await websocket.receive_text()
     except WebSocketDisconnect:
         manager.disconnect(websocket)
 
 # --- Periodic Actor Pruning ---
 async def prune_inactive_actors():
+    """
+    For scalability, this runs less frequently. In a hyper-scale environment,
+    actor heartbeats would be managed by a system like Redis with TTLs.
+    """
     while True:
-        await asyncio.sleep(30)
+        await asyncio.sleep(60) # Check less often
         now = datetime.utcnow()
         pruned_actors = {
             id: info for id, info in state["actors"].items()
-            if (now - datetime.fromisoformat(info["last_seen"])).total_seconds() < 60
+            if (now - datetime.fromisoformat(info["last_seen"])).total_seconds() < 120 # More lenient timeout
         }
         if len(pruned_actors) != len(state["actors"]):
             state["actors"] = pruned_actors

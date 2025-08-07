@@ -18,81 +18,46 @@ The use of this software to attack, disrupt, or gain unauthorized access to any 
 
 ## Core Features
 
-- **Modular Exploit Engine**: Gone are the days of hardcoded attacks. The framework now features a dynamic exploit loader. Each exploit is a self-contained Python class in the `app/exploits/` directory, allowing for easy creation of new, complex modules.
-- **Advanced Target Profiler**: Before engaging a target, the framework can run a detailed profile to fingerprint the server. It identifies the server type (Vanilla, Forge, etc.), and can enumerate the complete mod list on Forge servers.
+- **Modular Exploit Engine**: Each exploit is a self-contained Python class in the `app/exploits/` directory, allowing for easy creation of new modules.
+- **Advanced Target Profiler**: Uses the UDP query protocol to fingerprint servers (requires `enable-query=true` in `server.properties`).
 - **Distributed Architecture**: Scale your operations by deploying multiple `actor` nodes. The system is designed for horizontal scaling via Docker Compose.
 - **Web UI Mission Control**: A modern, responsive web interface to profile targets, select and configure exploit modules, and monitor operations in real-time.
-- **Live Log Streaming**: A WebSocket endpoint provides a live, color-coded feed of logs from the controller and all connected actors.
-- **Dynamic UI**: The UI is not static. It dynamically fetches the list of available exploits and their required arguments from the controller's API, ensuring the frontend always reflects the backend's capabilities.
-
----
-
-## Exploit Engine
-
-The power of this framework lies in its modularity. To create a new exploit, simply add a new Python file to the `app/exploits/` directory containing a class that inherits from `exploits.base.Exploit`.
-
-### How it Works
-1.  **Create a File**: Add a new `.py` file in `app/exploits/` (e.g., `app/exploits/my_new_exploit.py`).
-2.  **Inherit from Base**: Your class must inherit from `exploits.base.Exploit`.
-3.  **Define Metadata**: Set the class attributes `id`, `name`, `description`, and `category`.
-4.  **Define Arguments**: If your exploit needs custom parameters from the UI, define them in the `args` list. These will be rendered automatically on the frontend.
-5.  **Implement `run`**: The core logic of your exploit goes into the `run` method. This method is what each thread will execute in a loop.
-
-### Example: Creating a Chat Spammer
-
-```python
-# in app/exploits/chat_spam.py
-import time
-from .base import Exploit
-
-class ChatSpamExploit(Exploit):
-    # --- Metadata ---
-    id = "chat_spam"
-    name = "Chat Spam"
-    description = "Floods the server chat with a configurable message."
-    category = "Legitimate Stress Test"
-    
-    # --- Arguments for the UI ---
-    args = [
-        {
-            "name": "username",
-            "type": "string",
-            "label": "Bot Username",
-            "default": "SpamBot"
-        },
-        {
-            "name": "message",
-            "type": "string",
-            "label": "Spam Message",
-            "default": "This is a test message!"
-        }
-    ]
-
-    def run(self, log_callback):
-        # Access arguments passed from the UI
-        username = self.exploit_args.get("username")
-        message = self.exploit_args.get("message")
-
-        # In a real implementation, you would connect and send the chat packet.
-        # Here, we just log it.
-        log_callback({
-            "level": "INFO",
-            "message": f"Simulating '{username}' sending chat message: '{message}'"
-        })
-        time.sleep(1) # Simulate action
-```
-The framework will automatically discover, register, and display the new module in the UI.
+- **Live Log Streaming & Culling**: A WebSocket endpoint provides a live, color-coded feed of logs from all actors. The UI automatically culls logs after 500 entries to prevent browser slowdown.
+- **Scalability-Aware Actors**: Actors use batched logging and randomized check-in intervals (jitter) to reduce controller load and support larger-scale operations.
 
 ---
 
 ## Included Modules
 
-| ID                  | Name                 | Category                   | Description                                                                                             |
-| ------------------- | -------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------- |
-| `login_flood`       | Login Flood          | Legitimate Stress Test     | Floods the server with login attempts using random usernames.                                           |
-| `join_spam`         | Join/Leave Spam      | Legitimate Stress Test     | Repeatedly joins and leaves the server to stress player handling plugins.                               |
-| `handshake_crash`   | Handshake Crash      | Denial of Service          | Sends a malformed handshake packet that can crash older or unpatched servers.                           |
-| `forge_mod_exploit` | Forge Mod Exploit    | Denial of Service          | Example exploit that requires the server to be running Forge. Checks for a specific mod before running. |
+| Category                     | Name                 | Description                                                                                                                            |
+| ---------------------------- | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| **Vanilla (Offline-Mode)**   | Login Flood          | Floods the server with login attempts using random usernames. Effective against offline-mode servers.                                  |
+| **Vanilla (Any Mode)**       | Chat Spam            | Joins the server and floods the chat with configurable messages.                                                                       |
+| **Vanilla (Any Mode)**       | Book Ban (Kick)      | Crafts a book with excessive NBT data that can kick players who open it.                                                               |
+| **Vanilla (Any Mode)**       | Join/Leave Spam      | Repeatedly joins and leaves the server to stress player handling plugins and logs.                                                     |
+| **Denial of Service**        | Handshake Crash      | Sends a malformed handshake packet that can crash older or unpatched servers (e.g., 1.7.x).                                            |
+| **Remote Code Execution**    | Log4Shell RCE        | Sends a functional Log4Shell payload via chat. **Requires user-hosted malicious LDAP server.** Misuse is illegal and strictly prohibited. |
+| **Proxy Exploits**           | BungeeGuard Exploit  | Attempts to join a backend server directly, bypassing the proxy. Only works if the backend is exposed and misconfigured. (Disabled by default) |
+
+---
+
+## Scalability
+
+The framework has been designed with scaling in mind. However, the default controller/actor model via HTTP polling has natural limits.
+
+### Built-in Enhancements
+- **Actor Jitter**: Actors add a small, random delay to their check-in interval. This prevents thousands of actors from polling the controller at the exact same microsecond (the "thundering herd" problem).
+- **Batched Logging**: Actors collect logs locally and send them to the controller in batches, significantly reducing the number of `POST /log` requests.
+- **Asynchronous Processing**: The controller processes incoming data asynchronously to remain responsive under load.
+
+### Scaling to Thousands of Actors
+For deployments exceeding a few hundred actors, the HTTP polling model will become a bottleneck. The recommended architecture for hyper-scale operations is to replace the direct HTTP communication with a message broker like **Redis (Pub/Sub)** or **RabbitMQ**.
+
+- **Controller**: Publishes tasks to a message queue topic (e.g., `voidout:tasks`).
+- **Actors**: Subscribe to the `voidout:tasks` topic to receive work.
+- **Logging**: Actors publish logs to a `voidout:logs` topic, which can be consumed by a dedicated logging service or the controller.
+
+This decoupled architecture is significantly more resilient and scalable.
 
 ---
 
@@ -127,114 +92,3 @@ The easiest way to run the system is with Docker Compose.
     ```bash
     docker-compose down
     ```
-
----
-
-## Manual Container Execution (with `docker run`)
-
-For more granular control, you can run the controller and actor containers manually.
-
-### 1. Build the Docker Image
-```bash
-docker build -t exploit-framework -f app/Dockerfile .
-```
-
-### 2. Create a Docker Network
-```bash
-docker network create exploit-net
-```
-
-### 3. Run the Controller Container
-```bash
-docker run -d \
-  --name controller \
-  --network exploit-net \
-  -p 8000:8000 \
-  -v ./logs:/app/logs \
-  -e MODE=controller \
-  -e API_KEY="your-secret-api-key-here" \
-  exploit-framework
-```
-
-### 4. Run Actor Containers
-Launch as many actor containers as you need. The `ACTOR_ID` is automatically generated from the container's unique hostname.
-```bash
-# Launch the first actor
-docker run -d \
-  --network exploit-net \
-  -e MODE=actor \
-  -e CONTROLLER_HOST="http://controller:8000" \
-  exploit-framework
-
-# Launch a second actor
-docker run -d \
-  --network exploit-net \
-  -e MODE=actor \
-  -e CONTROLLER_HOST="http://controller:8000" \
-  exploit-framework
-```
-
----
-
-## Manual Execution (Without Docker)
-
-### 1. Setup
-```bash
-# Create and activate a virtual environment
-python3 -m venv venv
-source venv/bin/activate
-
-# Install dependencies
-pip install -r app/requirements.txt
-```
-
-### 2. Run the Controller
-```bash
-MODE=controller python app/main.py
-```
-
-### 3. Run Actors
-Open one or more new terminals. **It is critical that each actor has a unique `ACTOR_ID` when running manually on the same machine.**
-
-**Terminal 1 - Actor 1:**
-```bash
-source venv/bin/activate
-MODE=actor ACTOR_ID=manual-actor-01 python app/main.py
-```
-
-**Terminal 2 - Actor 2:**
-```bash
-source venv/bin/activate
-MODE=actor ACTOR_ID=manual-actor-02 python app/main.py
-```
-
----
-
-## API Documentation
-
-The controller listens on port `8000`. All administrative endpoints under `/api/` require an API key to be sent in the `X-API-Key` header.
-
-#### `GET /api/exploits`
-Lists all available, registered exploit modules and their configurable arguments.
-
-#### `POST /api/profile`
-Profiles a target server. Returns detailed server information, including mod lists for Forge servers.
-- **Body**: `{ "host": "...", "port": ... }`
-
-#### `POST /api/start`
-Starts an operation.
-- **Body**: `{ "host": "...", "port": ..., "threads": ..., "duration": ..., "exploit": "exploit_id", "exploit_args": { "arg1": "value1", ... } }`
-- **Note**: If the chosen exploit `requires_forge`, you must profile the target first. The controller will use the cached profile data.
-
-#### `POST /api/stop`
-Stops the current operation.
-
-#### `PUT /api/config`
-Updates the task configuration that will be used when the *next* task is started. Cannot be used while a task is running.
-- **Body**: Same as `/api/start`.
-
-### WebSocket Endpoint
-
-#### `WS /ws/logs`
-Connect to this endpoint to receive a real-time JSON stream of system status updates and log messages.
-- **Message Format**: `{ "type": "log" | "status_update", "payload": { ... } }`

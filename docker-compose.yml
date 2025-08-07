@@ -5,6 +5,7 @@ services:
     build:
       context: .
       dockerfile: app/Dockerfile
+    container_name: controller
     ports:
       - "8000:8000"
     volumes:
@@ -12,9 +13,13 @@ services:
     environment:
       - MODE=controller
       - API_KEY=you-should-really-change-this
-      - LISTEN_HOST=0.0.0.0
-      - LISTEN_PORT=8000
-    command: python main.py
+    networks:
+      - exploit-net
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
 
   actor:
     build:
@@ -22,16 +27,19 @@ services:
       dockerfile: app/Dockerfile
     depends_on:
       - controller
-    # Add extra_hosts to allow actors to connect to the host machine via host.docker.internal
-    # This is required on Linux and good practice for all platforms.
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    deploy:
-      # This defines the default number of actors.
-      # Scale on the command line with: docker-compose up --scale actor=N
-      replicas: 3
     environment:
       - MODE=actor
       - CONTROLLER_HOST=http://controller:8000
-      # ACTOR_ID is now derived from the container hostname in config.py
-    command: python main.py
+    networks:
+      - exploit-net
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+    # To scale, run:
+    # docker-compose up --build --scale actor=10 -d
+
+networks:
+  exploit-net:
+    driver: bridge

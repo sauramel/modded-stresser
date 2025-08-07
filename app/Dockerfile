@@ -1,15 +1,27 @@
-FROM python:3.11-slim
+# Use an official Python runtime as a parent image
+FROM python:3.9-slim
 
 # Set the working directory in the container
 WORKDIR /app
 
-# Copy and install dependencies
-COPY requirements.txt .
+# Copy the requirements file into the container at /app
+COPY ./requirements.txt .
+
+# Install any needed packages specified in requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the rest of the application code
+# Copy the rest of the application's code into the container at /app
 COPY . .
 
-# The command is specified in docker-compose.yml
-# to differentiate between controller and actor modes.
-# This allows the same image to be used for both services.
+# Make port 8000 available to the world outside this container
+EXPOSE 8000
+
+# Define environment variables
+ENV PYTHONUNBUFFERED 1
+ENV MODE="controller"
+ENV CONTROLLER_HOST="http://controller:8000"
+ENV API_KEY="voidout-is-cool"
+ENV ACTOR_ID=""
+
+# Run main.py when the container launches
+CMD ["python", "app/main.py"]

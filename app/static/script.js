@@ -1,6 +1,7 @@
 document.addEventListener('DOMContentLoaded', () => {
     // --- State ---
     let exploitsData = []; // Cache for exploit metadata including args
+    const MAX_LOG_LINES = 500;
 
     // --- DOM Elements ---
     const apiKeyInput = document.getElementById('apiKey');
@@ -193,6 +194,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const logToScreen = (logData) => {
         if (!logContainer) return;
+
+        // Log Culling: Remove the oldest log line if the max is reached
+        while (logBox.children.length >= MAX_LOG_LINES) {
+            logBox.removeChild(logBox.firstChild);
+        }
+
         const timestamp = new Date(logData.timestamp || Date.now()).toLocaleTimeString();
         const line = document.createElement('span');
         line.classList.add('log-line');
@@ -298,6 +305,10 @@ document.addEventListener('DOMContentLoaded', () => {
                         item.innerHTML = `<strong>${exploit.name}</strong><p>${exploit.description}</p>`;
                         if (exploit.requires_forge) {
                             item.innerHTML += `<span class="badge-forge">Requires Forge</span>`;
+                        }
+                        if (exploit.disabled) {
+                            item.classList.add('disabled');
+                            item.innerHTML += `<span class="badge-disabled">Disabled</span>`;
                         }
                         list.appendChild(item);
                     });
