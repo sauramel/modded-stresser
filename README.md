@@ -42,7 +42,7 @@ The framework will automatically discover, register, and display the new module 
 
 ---
 
-## Deployment with Docker
+## Deployment with Docker Compose
 
 The easiest way to run the system is with Docker Compose.
 
@@ -52,9 +52,7 @@ The easiest way to run the system is with Docker Compose.
 
 ### Instructions
 
-1.  **Clone the repository and navigate into it.**
-
-2.  **Set your API Key**: It is strongly recommended to change the default API key in the `docker-compose.yml` file.
+1.  **Set your API Key**: It is strongly recommended to change the default API key in the `docker-compose.yml` file.
     ```yaml
     services:
       controller:
@@ -63,34 +61,97 @@ The easiest way to run the system is with Docker Compose.
           - API_KEY=you-should-really-change-this
     ```
 
-3.  **Build and Run**:
+2.  **Build and Run**:
     ```bash
     # Build the images and start the controller and 3 actor containers in the background
     docker-compose up --build --scale actor=3 -d
     ```
 
-4.  **Open Mission Control**: Navigate to `http://localhost:8000` in your web browser.
+3.  **Open Mission Control**: Navigate to `http://localhost:8000` in your web browser.
 
-5.  **Configure and Run an Operation**:
-    -   Enter your API key if you changed it.
-    -   Enter the **Target Host** and **Port**. If testing a server on your local machine, use `host.docker.internal` as the host.
-    -   Click the **Profile** button to fingerprint the target. This will show its status, version, and enumerate mods if it's a Forge server.
-    -   The **Exploit Module** dropdown will be populated with all available exploits. Select one.
-    -   Configure **Threads** and **Duration**.
-    -   Click **Start Task**.
-
-6.  **View Live Logs**: Logs from the controller and all actors will stream into the "Live Operations Log" panel.
-
-7.  **Scale Actors**: You can change the number of running actors at any time.
-    ```bash
-    # Scale up to 10 actors
-    docker-compose up --scale actor=10 -d
-    ```
-
-8.  **Stop the System**:
+4.  **Stop the System**:
     ```bash
     docker-compose down
     ```
+
+---
+
+## Manual Container Execution (with `docker run`)
+
+For more granular control or integration with custom scripts, you can run the controller and actor containers manually.
+
+### Prerequisites
+- Docker
+
+### 1. Build the Docker Image
+
+First, build the universal Docker image from the project's root directory. We'll tag it as `exploit-framework` for easy reference.
+
+```bash
+docker build -t exploit-framework -f app/Dockerfile .
+```
+
+### 2. Create a Docker Network
+
+For the containers to communicate, they must share a network. Let's create one called `exploit-net`.
+
+```bash
+docker network create exploit-net
+```
+
+### 3. Run the Controller Container
+
+Launch the controller container on the `exploit-net` network. We give it the name `controller` so actors can find it easily.
+
+```bash
+docker run -d \
+  --name controller \
+  --network exploit-net \
+  -p 8000:8000 \
+  -e MODE=controller \
+  -e API_KEY="your-secret-api-key-here" \
+  exploit-framework
+```
+- `-d`: Run in detached mode.
+- `--name controller`: Critical for service discovery by actors.
+- `--network exploit-net`: Attaches the container to our shared network.
+- `-p 8000:8000`: Exposes the web UI and API on your host machine.
+- `-e MODE=controller`: Tells the container to start in controller mode.
+- `-e API_KEY`: Sets your secret API key.
+
+### 4. Run Actor Containers
+
+Now, launch as many actor containers as you need. They will connect to the controller using its container name (`controller`) as the hostname.
+
+```bash
+# Launch the first actor
+docker run -d \
+  --network exploit-net \
+  -e MODE=actor \
+  -e CONTROLLER_HOST="http://controller:8000" \
+  exploit-framework
+
+# Launch a second actor
+docker run -d \
+  --network exploit-net \
+  -e MODE=actor \
+  -e CONTROLLER_HOST="http://controller:8000" \
+  exploit-framework
+```
+- The `ACTOR_ID` is automatically generated from the container's unique hostname, so you don't need to set it manually.
+- You can run the command multiple times to scale up the number of actors.
+
+### 5. Stopping and Cleanup
+
+```bash
+# Stop and remove the containers
+docker stop controller && docker rm controller
+# You will need to find and stop each actor container individually or by a script
+docker ps -a | grep exploit-framework | awk '{print $1}' | xargs docker stop | xargs docker rm
+
+# Remove the network
+docker network rm exploit-net
+```
 
 ---
 
