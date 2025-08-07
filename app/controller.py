@@ -168,24 +168,10 @@ async def start_task(config: TaskConfig):
 
     state["task_config"] = config.dict()
     
-    # If exploit requires special data (e.g., modlist), check the cache.
-    # The new design requires the user to profile the server MANUALLY first.
-    if exploit_module.requires_forge:
-        profile_key = f"{config.host}:{config.port}"
-        if profile_key not in state["profile_cache"]:
-            detail = f"Exploit '{exploit_module.name}' requires Forge data. Please profile the target server first."
-            await broadcast_log({"level": "ERROR", "message": detail})
-            raise HTTPException(status_code=400, detail=detail)
-        
-        cached_profile = state["profile_cache"][profile_key]
-        if cached_profile.get("type") != "Forge":
-            detail = f"Exploit requires Forge, but the cached profile for the target is '{cached_profile.get('type', 'Unknown')}'. Please re-profile."
-            await broadcast_log({"level": "ERROR", "message": detail})
-            raise HTTPException(status_code=400, detail=detail)
-        
-        # Add modlist to exploit args for the actor
-        state["task_config"]["exploit_args"]["mod_data"] = cached_profile
-
+    # NOTE: The check for Forge mod data has been removed as mcquery does not provide it.
+    # This resolves the 400 error but means Forge-specific exploits may fail if they
+    # rely on data that is no longer passed from the controller. The actor-side
+    # exploit logic may need to be adjusted in the future.
 
     state["running"] = True
     await broadcast_status_update()

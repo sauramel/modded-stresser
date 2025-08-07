@@ -281,24 +281,29 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             exploitLibraryList.innerHTML = '';
-             for (const category in categories) {
-                const categoryDiv = document.createElement('div');
-                categoryDiv.className = 'exploit-category';
-                const categoryTitle = document.createElement('h3');
-                categoryTitle.textContent = category;
-                categoryDiv.appendChild(categoryTitle);
-                
-                const list = document.createElement('ul');
-                categories[category].forEach(exploit => {
-                    const item = document.createElement('li');
-                    item.innerHTML = `<strong>${exploit.name}</strong><p>${exploit.description}</p>`;
-                    if (exploit.requires_forge) {
-                        item.innerHTML += `<span class="badge-forge">Requires Forge</span>`;
-                    }
-                    list.appendChild(item);
-                });
-                categoryDiv.appendChild(list);
-                exploitLibraryList.appendChild(categoryDiv);
+            const categoryKeys = Object.keys(categories);
+            if (categoryKeys.length === 0) {
+                exploitLibraryList.innerHTML = '<p class="placeholder-text">No exploits found or loaded.</p>';
+            } else {
+                 for (const category in categories) {
+                    const categoryDiv = document.createElement('div');
+                    categoryDiv.className = 'exploit-category';
+                    const categoryTitle = document.createElement('h3');
+                    categoryTitle.textContent = category;
+                    categoryDiv.appendChild(categoryTitle);
+                    
+                    const list = document.createElement('ul');
+                    categories[category].forEach(exploit => {
+                        const item = document.createElement('li');
+                        item.innerHTML = `<strong>${exploit.name}</strong><p>${exploit.description}</p>`;
+                        if (exploit.requires_forge) {
+                            item.innerHTML += `<span class="badge-forge">Requires Forge</span>`;
+                        }
+                        list.appendChild(item);
+                    });
+                    categoryDiv.appendChild(list);
+                    exploitLibraryList.appendChild(categoryDiv);
+                }
             }
             
             // Render args for the initially selected exploit
@@ -308,7 +313,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         } catch (error) {
             exploitSelect.innerHTML = '<option value="">Error loading exploits</option>';
-            exploitLibraryList.innerHTML = '<p>Could not load exploit library. Check API key and controller status.</p>';
+            exploitLibraryList.innerHTML = '<p class="placeholder-text">Could not load exploit library. Check API key and controller status.</p>';
         }
     };
 
@@ -407,8 +412,13 @@ document.addEventListener('DOMContentLoaded', () => {
         populateExploits();
         switchView('dashboard');
         
-        profileHostInput.value = document.getElementById('host').value;
-        profilePortInput.value = document.getElementById('port').value;
+        // Sync the profiler input with the main form input
+        const hostInput = document.getElementById('host');
+        const portInput = document.getElementById('port');
+        profileHostInput.value = hostInput.value;
+        profilePortInput.value = portInput.value;
+        hostInput.addEventListener('change', (e) => profileHostInput.value = e.target.value);
+        portInput.addEventListener('change', (e) => profilePortInput.value = e.target.value);
     };
 
     init();
