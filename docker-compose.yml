@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  controller:
+    build:
+      context: .
+      dockerfile: app/Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./logs:/app/logs
+    environment:
+      - MODE=controller
+      - API_KEY=you-should-really-change-this
+      - LISTEN_PORT=8000
+    command: python main.py
+
+  actor:
+    build:
+      context: .
+      dockerfile: app/Dockerfile
+    depends_on:
+      - controller
+    deploy:
+      replicas: 3 # Default number of actors, scale with `docker-compose up --scale actor=N`
+    environment:
+      - MODE=actor
+      - CONTROLLER_HOST=http://controller:8000
+      # ACTOR_ID is generated automatically in config.py
+    command: python main.py
